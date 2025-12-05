@@ -188,15 +188,11 @@ st.markdown("""
     }
     
     /* Cast name buttons - uniform size */
-    [data-testid="stVerticalBlock"] .stButton > button {
-        line-height: 1.1 !important;
-    }
-    .cast-container ~ div .stButton > button,
-    div:has(> .cast-container) + div button {
-        min-height: 38px !important;
-        max-height: 38px !important;
-        font-size: 0.8rem !important;
-        padding: 6px 2px !important;
+    [data-testid="column"] .stButton > button {
+        min-height: 36px !important;
+        max-height: 36px !important;
+        font-size: 0.75rem !important;
+        padding: 4px 2px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
