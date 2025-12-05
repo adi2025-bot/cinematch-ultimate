@@ -161,6 +161,17 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
     }
     
+    /* Cast name buttons - uniform size */
+    .cast-container + div button {
+        min-height: 42px !important;
+        max-height: 42px !important;
+        font-size: 0.85rem !important;
+        padding: 8px 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    
     /* SIDEBAR INFO BOX - JioHotstar */
     .info-box { 
         background: linear-gradient(145deg, rgba(26, 26, 46, 0.9) 0%, rgba(22, 33, 62, 0.9) 100%); 
