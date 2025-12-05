@@ -1017,23 +1017,22 @@ def get_top_movies():
 def display_movies_grid(movies_to_show):
     if not movies_to_show:
         st.info("No movies found."); return
-    # Build all movie cards as HTML
-    cards_html = ""
-    for data in movies_to_show:
-        link_url = f"?id={data['id']}&user={st.session_state.username}"
-        cards_html += f"""
-        <a href="{link_url}" target="_self" style="text-decoration:none;">
-            <div class="movie-card">
-                <img src="{data['poster']}">
-                <div class="card-content">
-                    <div class="card-title">{data['title']}</div>
-                    <div class="card-meta">{data['rating']}</div>
-                </div>
-            </div>
-        </a>
-        """
-    # Wrap in responsive grid container
-    st.markdown(f'<div class="movies-grid">{cards_html}</div>', unsafe_allow_html=True)
+    for i in range(0, len(movies_to_show), 5):
+        cols = st.columns(5, gap="medium")
+        batch = movies_to_show[i:i+5]
+        for idx, data in enumerate(batch):
+            with cols[idx]:
+                link_url = f"?id={data['id']}&user={st.session_state.username}"
+                st.markdown(f"""
+                <a href="{link_url}" target="_self" style="text-decoration:none;">
+                    <div class="movie-card">
+                        <img src="{data['poster']}">
+                        <div class="card-content">
+                            <div class="card-title">{data['title']}</div>
+                            <div class="card-meta">{data['rating']}</div>
+                        </div>
+                    </div>
+                </a>""", unsafe_allow_html=True)
 
 def set_detail(movie_id): 
     row = movies[movies['movie_id'] == movie_id].iloc[0]
