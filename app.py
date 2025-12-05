@@ -102,6 +102,32 @@ st.markdown("""
     .card-title { font-size: 1rem; font-weight: 700; margin: 0 0 5px 0; line-height: 1.2; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-meta { font-size: 0.85rem; color: #a5b4fc; }
     
+    /* RESPONSIVE MOVIE GRID */
+    .movies-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 20px;
+        padding: 10px 0;
+    }
+    @media (max-width: 1200px) {
+        .movies-grid { grid-template-columns: repeat(4, 1fr); gap: 15px; }
+    }
+    @media (max-width: 900px) {
+        .movies-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    }
+    @media (max-width: 600px) {
+        .movies-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .movie-card { margin-bottom: 0; border-radius: 12px; }
+        .card-content { padding: 10px; }
+        .card-title { font-size: 0.85rem; }
+        .card-meta { font-size: 0.7rem; }
+    }
+    @media (max-width: 400px) {
+        .movies-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .card-content { padding: 8px; }
+        .card-title { font-size: 0.75rem; }
+    }
+    
     /* HERO SECTION - JioHotstar Style */
     .hero-container {
         position: relative; border-radius: 24px; overflow: hidden; 
@@ -991,22 +1017,23 @@ def get_top_movies():
 def display_movies_grid(movies_to_show):
     if not movies_to_show:
         st.info("No movies found."); return
-    for i in range(0, len(movies_to_show), 5):
-        cols = st.columns(5, gap="medium")
-        batch = movies_to_show[i:i+5]
-        for idx, data in enumerate(batch):
-            with cols[idx]:
-                link_url = f"?id={data['id']}&user={st.session_state.username}"
-                st.markdown(f"""
-                <a href="{link_url}" target="_self" style="text-decoration:none;">
-                    <div class="movie-card">
-                        <img src="{data['poster']}">
-                        <div class="card-content">
-                            <div class="card-title">{data['title']}</div>
-                            <div class="card-meta">{data['rating']}</div>
-                        </div>
-                    </div>
-                </a>""", unsafe_allow_html=True)
+    # Build all movie cards as HTML
+    cards_html = ""
+    for data in movies_to_show:
+        link_url = f"?id={data['id']}&user={st.session_state.username}"
+        cards_html += f"""
+        <a href="{link_url}" target="_self" style="text-decoration:none;">
+            <div class="movie-card">
+                <img src="{data['poster']}">
+                <div class="card-content">
+                    <div class="card-title">{data['title']}</div>
+                    <div class="card-meta">{data['rating']}</div>
+                </div>
+            </div>
+        </a>
+        """
+    # Wrap in responsive grid container
+    st.markdown(f'<div class="movies-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 def set_detail(movie_id): 
     row = movies[movies['movie_id'] == movie_id].iloc[0]
