@@ -1,0 +1,38 @@
+# Exclude large files (over 100MB or not needed)
+similarity.pkl
+movie_list_optimized.pkl
+similarity_optimized.pkl
+tmdb_5000_credits.csv
+tmdb_5000_movies.csv
+
+# NOTE: These files WILL be included for deployment:
+# - movie_list.pkl (~44MB) ✓
+# - similarity.pkl.gz (~50MB) ✓
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Helper scripts (not needed for deployment)
+audit_data.py
+check_hindi.py
+check_keywords.py
+compress.py
+find_errors.py
+fix_indentation.py
+inspect_columns.py
+inspect_data.py
+inspect_pickle.py
+optimize_data.py
+test_bollywood_api.py
+main.py
+share.py
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

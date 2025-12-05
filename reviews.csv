@@ -1,0 +1,21 @@
+username,movie,rating,review,date,sentiment
+adi123,The Dark Knight,8,"satisfied
+",2025-11-24,Neutral
+adi123,The Dark Knight,6,"satisfied
+",2025-11-24,Neutral
+adi123,Interstellar,8,good,2025-11-24,Positive
+adi123,Fight Club,8,good,2025-11-24,Positive
+adi123,Evan Almighty,8,bad,2025-11-24,Negative
+adi123,Evan Almighty,9,bad,2025-11-24,Negative
+adi123,Batman v Superman: Dawn of Justice,8,"good
+",2025-11-25,Positive
+adi123,The Dark Knight Rises,8,good,2025-11-25,Positive
+adi123,The Legend of Zorro,8,"good
+",2025-12-01,Positive
+adi123,The Machinist,8,good,2025-12-02,Positive
+adi123,The Machinist,7,good,2025-12-02,Positive
+adi123,The Dark Knight Rises,8,good,2025-12-02,Positive
+saga123,Spider-Man 3,8,good,2025-12-05,Positive
+srs09,The Shawshank Redemption,10,excellent ,2025-12-05,Positive
+srs09,Spider-Man 2,8,"good
+",2025-12-05,Positive
