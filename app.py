@@ -1430,11 +1430,20 @@ else:
         else:
             if st.session_state.view_mode == 'detail' and st.session_state.detail_movie:
                 m = st.session_state.detail_movie
+                
+                # CINEMATCH Header Bar
+                st.markdown(f'''
+                <div class="nav-header">
+                    <div class="logo">CINEMATCH</div>
+                    <div class="user-badge">👤 {st.session_state.username}</div>
+                </div>
+                ''', unsafe_allow_html=True)
+                
                 back_label = "← Back"
                 if st.session_state.page == 'home': back_label = "← Back to Home"
                 elif st.session_state.page == 'genre': back_label = f"← Back to {st.session_state.selected_genre}"
                 elif st.session_state.page == 'search': back_label = "← Back to Search Results"
-                if st.button(back_label, type="secondary"): go_grid(); st.rerun()
+                if st.button(back_label, type="primary"): go_grid(); st.rerun()
                 st.markdown(f"""
                 <div class="hero-container" style="background-image: url('{m['backdrop']}');">
                     <div class="hero-overlay">
