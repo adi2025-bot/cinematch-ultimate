@@ -86,16 +86,33 @@ st.markdown("""
         text-decoration: none; color: white; display: block;
         background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
         border-radius: 16px; overflow: hidden;
-        border: 1px solid rgba(138, 43, 226, 0.15); 
+        border: 2px solid rgba(0, 212, 255, 0.2); 
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         height: 100%; cursor: pointer;
         margin-bottom: 25px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transform-style: preserve-3d;
+        perspective: 1000px;
     }
     .movie-card:hover { 
-        transform: translateY(-8px) scale(1.02); 
-        border-color: #8b5cf6; 
-        box-shadow: 0 20px 40px rgba(139, 92, 246, 0.3); 
+        transform: translateY(-12px) scale(1.05) rotateX(5deg); 
+        border-color: #00d4ff; 
+        box-shadow: 0 25px 50px rgba(0, 212, 255, 0.4), 
+                    0 0 30px rgba(0, 212, 255, 0.3),
+                    inset 0 0 20px rgba(0, 212, 255, 0.1); 
+    }
+    .movie-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0) 0%, rgba(0, 212, 255, 0.1) 100%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .movie-card:hover::before {
+        opacity: 1;
     }
     .movie-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;}
     .card-content { padding: 15px; background: linear-gradient(to top, rgba(15, 12, 41, 0.95) 60%, transparent); }
@@ -764,6 +781,150 @@ st.markdown("""
         }
     }
     
+    /* ========================================== */
+    /* SKELETON LOADING ANIMATION */
+    /* ========================================== */
+    @keyframes skeleton-pulse {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .skeleton {
+        background: linear-gradient(90deg, #2a2a3e 25%, #3d3d52 50%, #2a2a3e 75%);
+        background-size: 200% 100%;
+        animation: skeleton-pulse 1.5s ease-in-out infinite;
+        border-radius: 12px;
+    }
+    .skeleton-card {
+        width: 100%;
+        aspect-ratio: 2/3;
+        margin-bottom: 10px;
+    }
+    .skeleton-text {
+        height: 14px;
+        width: 80%;
+        margin: 8px auto;
+        border-radius: 6px;
+    }
+    .skeleton-text-sm {
+        height: 10px;
+        width: 50%;
+        margin: 6px auto;
+        border-radius: 4px;
+    }
+    .skeleton-container {
+        background: rgba(30, 30, 46, 0.6);
+        border-radius: 16px;
+        padding: 10px;
+        overflow: hidden;
+    }
+    
+    /* ========================================== */
+    /* PAGE TRANSITION ANIMATIONS */
+    /* ========================================== */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-30px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    .page-transition {
+        animation: fadeIn 0.4s ease-out;
+    }
+    .slide-up {
+        animation: slideUp 0.5s ease-out;
+    }
+    .slide-left {
+        animation: slideInLeft 0.4s ease-out;
+    }
+    .scale-in {
+        animation: scaleIn 0.3s ease-out;
+    }
+    
+    /* Staggered movie card animations */
+    .stColumn > div > div {
+        animation: slideUp 0.4s ease-out backwards;
+    }
+    .stColumn:nth-child(1) > div > div { animation-delay: 0.05s; }
+    .stColumn:nth-child(2) > div > div { animation-delay: 0.1s; }
+    .stColumn:nth-child(3) > div > div { animation-delay: 0.15s; }
+    .stColumn:nth-child(4) > div > div { animation-delay: 0.2s; }
+    .stColumn:nth-child(5) > div > div { animation-delay: 0.25s; }
+    
+    /* Hero section animation */
+    .hero-container {
+        animation: scaleIn 0.6s ease-out;
+    }
+    
+    /* Content sections animation */
+    .stMarkdown h3 {
+        animation: slideInLeft 0.4s ease-out;
+    }
+    
+    /* ========================================== */
+    /* MOBILE BOTTOM NAVIGATION */
+    /* ========================================== */
+    @media (max-width: 768px) {
+        .mobile-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 15, 25, 0.98);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0 18px 0;
+            border-top: 1px solid rgba(139, 92, 246, 0.3);
+            z-index: 9999;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #666;
+            text-decoration: none;
+            font-size: 0.65rem;
+            transition: all 0.2s ease;
+            padding: 5px 15px;
+        }
+        .nav-item:hover, .nav-item.active {
+            color: #8b5cf6;
+        }
+        .nav-item.active .nav-icon {
+            transform: scale(1.1);
+        }
+        .nav-icon {
+            font-size: 1.3rem;
+            margin-bottom: 3px;
+            transition: transform 0.2s ease;
+        }
+        
+        /* Add padding at bottom for nav bar space */
+        .main .block-container {
+            padding-bottom: 85px !important;
+        }
+    }
+    
+    /* Hide mobile nav on desktop */
+    @media (min-width: 769px) {
+        .mobile-nav {
+            display: none !important;
+        }
+    }
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -773,7 +934,7 @@ st.markdown("""
 def make_hashes(p): return hashlib.sha256(str.encode(p)).hexdigest()
 
 def create_dbs():
-    if not os.path.exists('users.csv'): pd.DataFrame(columns=['username','password','role']).to_csv('users.csv',index=False)
+    if not os.path.exists('users.csv'): pd.DataFrame(columns=['username','password','role','security_question','security_answer']).to_csv('users.csv',index=False)
     if not os.path.exists('watchlist.csv'): pd.DataFrame(columns=['username','movie','date']).to_csv('watchlist.csv',index=False)
     if not os.path.exists('feedback.csv'): pd.DataFrame(columns=['username','movie','feedback','date']).to_csv('feedback.csv',index=False)
     if not os.path.exists('reviews.csv'): 
@@ -783,10 +944,48 @@ def create_dbs():
         if 'sentiment' not in df.columns:
             df['sentiment'] = 'Neutral'; df.to_csv('reviews.csv', index=False)
 
-def add_user(u,p):
+def add_user(u, p, security_q="", security_a=""):
     create_dbs(); df=pd.read_csv('users.csv')
     if u in df['username'].values: return False
-    new=pd.DataFrame({'username':[u],'password':[make_hashes(p)],'role':['user']}); df=pd.concat([df,new],ignore_index=True); df.to_csv('users.csv',index=False); return True
+    new=pd.DataFrame({
+        'username':[u],
+        'password':[make_hashes(p)],
+        'role':['user'],
+        'security_question':[security_q],
+        'security_answer':[make_hashes(security_a.lower()) if security_a else ""]
+    })
+    df=pd.concat([df,new],ignore_index=True); df.to_csv('users.csv',index=False); return True
+
+def reset_password(username, new_password):
+    """Reset password for a user"""
+    df = pd.read_csv('users.csv')
+    if username in df['username'].values:
+        df.loc[df['username'] == username, 'password'] = make_hashes(new_password)
+        df.to_csv('users.csv', index=False)
+        return True
+    return False
+
+def verify_security_answer(username, answer):
+    """Verify if security answer matches"""
+    df = pd.read_csv('users.csv')
+    user_row = df[df['username'] == username]
+    if not user_row.empty:
+        stored_answer = user_row.iloc[0].get('security_answer', '')
+        if stored_answer and stored_answer == make_hashes(answer.lower()):
+            return True
+    return False
+
+def get_security_question(username):
+    """Get security question for a user"""
+    df = pd.read_csv('users.csv')
+    user_row = df[df['username'] == username]
+    if not user_row.empty:
+        question = user_row.iloc[0].get('security_question', '')
+        # Handle NaN and empty values
+        if pd.isna(question) or question == '' or str(question).lower() == 'nan':
+            return ''  # No security question set
+        return str(question)
+    return None  # User not found
 
 def login_user(u,p):
     create_dbs(); df=pd.read_csv('users.csv'); h=make_hashes(p)
@@ -916,15 +1115,9 @@ def load_data():
         if not os.path.exists('movie_list.pkl'): return None, None
         movies_dict = pickle.load(open('movie_list.pkl','rb'))
         
-        # Use compressed similarity file for GitHub (under 100MB limit)
-        import gzip
-        if os.path.exists('similarity.pkl.gz'):
-            with gzip.open('similarity.pkl.gz', 'rb') as f:
-                similarity = pickle.load(f)
-        elif os.path.exists('similarity.pkl'):
-            similarity = pickle.load(open('similarity.pkl','rb'))
-        else:
-            similarity = None
+        # Skip loading similarity matrix to speed up startup
+        # (Similar Movies feature was removed)
+        similarity = None
             
         movies = pd.DataFrame(movies_dict)
         movies['year_int'] = pd.to_datetime(movies['release_date'], errors='coerce').dt.year.fillna(0).astype(int)
@@ -1010,6 +1203,22 @@ def get_top_movies():
     q['score']=q.apply(lambda x: (x['vote_count']/(x['vote_count']+m)*x['vote_average'])+(m/(m+x['vote_count'])*C), axis=1)
     return q.sort_values('score',ascending=False).head(20)
 
+def display_skeleton_grid(count=10):
+    """Display skeleton loading placeholders while content loads"""
+    rows = (count + 4) // 5  # Calculate rows needed
+    for row in range(rows):
+        cols = st.columns(5, gap="medium")
+        for idx in range(5):
+            if row * 5 + idx < count:
+                with cols[idx]:
+                    st.markdown('''
+                    <div class="skeleton-container">
+                        <div class="skeleton skeleton-card"></div>
+                        <div class="skeleton skeleton-text"></div>
+                        <div class="skeleton skeleton-text-sm"></div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+
 def display_movies_grid(movies_to_show):
     if not movies_to_show:
         st.info("No movies found."); return
@@ -1058,13 +1267,13 @@ if not st.session_state.logged_in:
     lc1, lc2, lc3 = st.columns([1, 1, 1])
     with lc2:
         st.markdown("""<div class='login-container'><div class='login-title'>CineMatch</div><div class='login-subtitle'>Your gateway to unlimited entertainment.</div></div>""", unsafe_allow_html=True)
-        tab_login, tab_register = st.tabs(["🔒 Sign In", "📝 Register"])
+        tab_login, tab_register, tab_forgot = st.tabs(["🔒 Sign In", "📝 Register", "🔑 Forgot Password"])
         with tab_login:
             with st.form("login_form"):
                 st.markdown("<br>", unsafe_allow_html=True)
                 u = st.text_input("Username", placeholder="Username")
                 p = st.text_input("Password", type='password', placeholder="Password")
-                st.markdown("""<div style='text-align: right; margin-top: -10px; margin-bottom: 20px;'><a href='#' style='color: #b3b3b3; font-size: 0.8rem; text-decoration: none;'>Forgot Password?</a></div>""", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
                 submitted = st.form_submit_button("Sign In", use_container_width=True)
                 if submitted:
                     v, r = login_user(u, p)
@@ -1077,13 +1286,65 @@ if not st.session_state.logged_in:
                 st.markdown("<br>", unsafe_allow_html=True)
                 nu = st.text_input("Choose Username", placeholder="New username")
                 np = st.text_input("Choose Password", type='password', placeholder="New password")
+                st.markdown("---")
+                st.markdown("**Security Question** (for password recovery)")
+                security_questions = [
+                    "What is your pet's name?",
+                    "What city were you born in?",
+                    "What is your favorite movie?",
+                    "What was your first school's name?",
+                    "What is your mother's maiden name?"
+                ]
+                sec_q = st.selectbox("Select a security question", security_questions)
+                sec_a = st.text_input("Your Answer", placeholder="Enter your answer")
                 st.markdown("<br>", unsafe_allow_html=True)
                 reg_submitted = st.form_submit_button("Create Account", use_container_width=True)
                 if reg_submitted: 
-                    if nu and np:
-                        if add_user(nu, np): st.success("Account created! Please Sign In.")
-                        else: st.error("Username already taken.")
-                    else: st.warning("Please fill in all fields.")
+                    if nu and np and sec_a:
+                        if len(np) >= 4:
+                            if add_user(nu, np, sec_q, sec_a): 
+                                st.success("✅ Account created! Please Sign In.")
+                            else: 
+                                st.error("Username already taken.")
+                        else:
+                            st.error("Password must be at least 4 characters!")
+                    else: 
+                        st.warning("Please fill in all fields including security answer.")
+        with tab_forgot:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("**Reset Your Password**")
+            forgot_user = st.text_input("Enter your username", placeholder="Your username", key="forgot_user")
+            
+            if forgot_user:
+                sec_question = get_security_question(forgot_user)
+                if sec_question:
+                    st.info(f"**Security Question:** {sec_question}")
+                    with st.form("reset_form"):
+                        sec_ans = st.text_input("Your Answer", placeholder="Enter your security answer", type="password")
+                        new_pass = st.text_input("New Password", placeholder="Enter new password", type="password")
+                        confirm_pass = st.text_input("Confirm Password", placeholder="Confirm new password", type="password")
+                        
+                        if st.form_submit_button("Reset Password", use_container_width=True):
+                            if sec_ans and new_pass and confirm_pass:
+                                if verify_security_answer(forgot_user, sec_ans):
+                                    if new_pass == confirm_pass:
+                                        if len(new_pass) >= 4:
+                                            if reset_password(forgot_user, new_pass):
+                                                st.success("✅ Password reset successful! Please Sign In.")
+                                            else:
+                                                st.error("Error resetting password.")
+                                        else:
+                                            st.error("Password must be at least 4 characters!")
+                                    else:
+                                        st.error("Passwords don't match!")
+                                else:
+                                    st.error("Incorrect security answer!")
+                            else:
+                                st.warning("Please fill in all fields.")
+                elif sec_question == '':
+                    st.warning("This account doesn't have a security question. Please contact admin.")
+                else:
+                    st.error("Username not found.")
 else:
     if st.session_state.show_splash:
         splash_container = st.empty()
@@ -1146,7 +1407,7 @@ else:
                     for sublist in movies['genres_list']:
                         if isinstance(sublist, list):
                             for g in sublist: all_genres.add(g)
-                    genre_options = ["All", "Adult"] + sorted(list(all_genres))
+                    genre_options = ["All", "Bollywood", "Adult"] + sorted(list(all_genres))
                     sel_g = st.selectbox("By Genre", genre_options)
                     st.markdown("#### Year Range")
                     min_yr, max_yr = st.slider("Year", 1950, 2024, (1990, 2024))
@@ -1204,10 +1465,60 @@ else:
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # TRAILER SECTION
+                    # TRAILER SECTION - Click-to-play to avoid bot detection
                     st.markdown("### 🎬 Trailer")
                     if m['trailer']: 
-                        st.video(f"https://www.youtube.com/watch?v={m['trailer']}")
+                        trailer_key = f"play_trailer_{m['id']}"
+                        if trailer_key not in st.session_state:
+                            st.session_state[trailer_key] = False
+                        
+                        if not st.session_state[trailer_key]:
+                            # Show thumbnail with play button
+                            thumbnail_url = f"https://img.youtube.com/vi/{m['trailer']}/maxresdefault.jpg"
+                            st.markdown(f'''
+                            <div style="position: relative; border-radius: 12px; overflow: hidden; margin-top: 10px; cursor: pointer; background: #1a1a2e;">
+                                <img src="{thumbnail_url}" style="width: 100%; border-radius: 12px;" 
+                                     onerror="this.src='https://img.youtube.com/vi/{m['trailer']}/hqdefault.jpg'">
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                            background: rgba(255,0,0,0.9); width: 70px; height: 50px; border-radius: 12px;
+                                            display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 0; height: 0; border-left: 18px solid white; border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px;"></div>
+                                </div>
+                            </div>
+                            ''', unsafe_allow_html=True)
+                            if st.button("▶ Play Trailer", key=f"btn_{m['id']}", use_container_width=True):
+                                st.session_state[trailer_key] = True
+                                st.rerun()
+                        else:
+                            # Show embedded video with animated gradient border
+                            st.markdown(f'''
+                            <style>
+                            @keyframes borderGlow {{
+                                0% {{ border-color: #00d4ff; box-shadow: 0 0 15px #00d4ff; }}
+                                50% {{ border-color: #00ffff; box-shadow: 0 0 25px #00ffff; }}
+                                100% {{ border-color: #00d4ff; box-shadow: 0 0 15px #00d4ff; }}
+                            }}
+                            .trailer-frame {{
+                                position: relative;
+                                padding-bottom: 56.25%;
+                                height: 0;
+                                overflow: hidden;
+                                border-radius: 16px;
+                                border: 3px solid #8b5cf6;
+                                animation: borderGlow 4s ease-in-out infinite;
+                                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                            }}
+                            </style>
+                            <div class="trailer-frame">
+                                <iframe src="https://www.youtube-nocookie.com/embed/{m['trailer']}?autoplay=1" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; border-radius: 12px;"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowfullscreen></iframe>
+                            </div>
+                            ''', unsafe_allow_html=True)
+                            if st.button("🔄 Reload Trailer", key=f"reload_{m['id']}", use_container_width=True):
+                                st.session_state[trailer_key] = False
+                                st.rerun()
                     else: 
                         st.link_button("🔎 Search on YouTube", f"https://www.youtube.com/results?search_query={m['title']}+trailer", use_container_width=True)
                     
@@ -1296,6 +1607,40 @@ else:
                         fig = px.bar(top_likes.head(10), x='Movie', y='Count', color='Count', title="Top 10 Liked")
                         st.plotly_chart(fig, use_container_width=True)
                 except Exception as e: st.error(f"Error: {e}")
+                
+                # ADMIN PASSWORD RESET SECTION
+                st.markdown("---")
+                st.markdown("### 🔐 Reset User Password")
+                try:
+                    users_df = pd.read_csv('users.csv')
+                    user_list = users_df['username'].tolist()
+                    user_list = [u for u in user_list if u != 'admin']  # Exclude admin
+                    
+                    if user_list:
+                        with st.form("admin_reset_form"):
+                            selected_user = st.selectbox("Select User", user_list)
+                            new_password = st.text_input("New Password", type="password", placeholder="Enter new password")
+                            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Confirm new password")
+                            
+                            if st.form_submit_button("🔄 Reset Password", use_container_width=True):
+                                if new_password and confirm_password:
+                                    if new_password == confirm_password:
+                                        if len(new_password) >= 4:
+                                            # Update password
+                                            new_hash = make_hashes(new_password)
+                                            users_df.loc[users_df['username'] == selected_user, 'password'] = new_hash
+                                            users_df.to_csv('users.csv', index=False)
+                                            st.success(f"✅ Password reset for '{selected_user}' successful!")
+                                        else:
+                                            st.error("Password must be at least 4 characters!")
+                                    else:
+                                        st.error("Passwords don't match!")
+                                else:
+                                    st.error("Please fill both password fields!")
+                    else:
+                        st.info("No users to reset (only admin exists)")
+                except Exception as e:
+                    st.error(f"Error loading users: {e}")
             else:
                 if st.session_state.page == 'home':
                     st.markdown("### 🔥 Trending Now")
@@ -1325,10 +1670,13 @@ else:
                     min_y, max_y = st.session_state.min_year, st.session_state.max_year
                     min_r = st.session_state.min_rating
                     sub_df = movies[(movies['year_int'] >= min_y) & (movies['year_int'] <= max_y) & (movies['vote_average'] * 10 >= min_r)]
-                    if g != "All" and g != "Adult":
-                        sub_df = sub_df[sub_df['genres_list'].apply(lambda x: g in x if isinstance(x, list) else False)]
+                    if g == "Bollywood":
+                        # Filter by Hindi language
+                        sub_df = sub_df[sub_df['original_language'] == 'hi'] if 'original_language' in sub_df.columns else sub_df
                     elif g == "Adult":
                         sub_df = sub_df[sub_df['adult'] == True] if 'adult' in sub_df.columns else pd.DataFrame()
+                    elif g != "All":
+                        sub_df = sub_df[sub_df['genres_list'].apply(lambda x: g in x if isinstance(x, list) else False)]
                     sub_df = sub_df.head(30)
                     with ThreadPoolExecutor(max_workers=3) as executor:
                         movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
@@ -1376,3 +1724,22 @@ else:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         st.markdown("### 👍 Liked Movies"); display_movies_grid(movies_to_show)
                     else: st.info("No liked movies yet.")
+            
+            # Mobile Bottom Navigation Bar
+            current_page = st.session_state.page
+            st.markdown(f'''
+            <div class="mobile-nav">
+                <a href="?page=home&user={st.session_state.username}" class="nav-item {'active' if current_page=='home' else ''}">
+                    <span class="nav-icon">🏠</span>Home
+                </a>
+                <a href="?page=recent&user={st.session_state.username}" class="nav-item {'active' if current_page=='recent' else ''}">
+                    <span class="nav-icon">🕐</span>Recent
+                </a>
+                <a href="?page=watchlist&user={st.session_state.username}" class="nav-item {'active' if current_page=='watchlist' else ''}">
+                    <span class="nav-icon">❤️</span>Saved
+                </a>
+                <a href="?page=liked&user={st.session_state.username}" class="nav-item {'active' if current_page=='liked' else ''}">
+                    <span class="nav-icon">👍</span>Liked
+                </a>
+            </div>
+            ''', unsafe_allow_html=True)
