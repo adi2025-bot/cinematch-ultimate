@@ -1115,9 +1115,14 @@ def load_data():
         if not os.path.exists('movie_list.pkl'): return None, None
         movies_dict = pickle.load(open('movie_list.pkl','rb'))
         
-        # Skip loading similarity matrix to speed up startup
-        # (Similar Movies feature was removed)
+        # Load similarity matrix (compressed or regular)
+        import gzip
         similarity = None
+        if os.path.exists('similarity.pkl.gz'):
+            with gzip.open('similarity.pkl.gz', 'rb') as f:
+                similarity = pickle.load(f)
+        elif os.path.exists('similarity.pkl'):
+            similarity = pickle.load(open('similarity.pkl','rb'))
             
         movies = pd.DataFrame(movies_dict)
         movies['year_int'] = pd.to_datetime(movies['release_date'], errors='coerce').dt.year.fillna(0).astype(int)
