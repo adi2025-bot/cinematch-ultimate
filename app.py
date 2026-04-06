@@ -61,7 +61,17 @@ st.markdown("""
         color: #ffffff; 
     }
     
-    #MainMenu, footer {visibility: hidden;} 
+    #MainMenu, footer, header {visibility: hidden;} 
+    .stApp > header {display: none;}
+    .viewerBadge_container__1QSob, .viewerBadge_link__1S137 {display: none !important;}
+    
+    html { scroll-behavior: smooth; }
+    /* Force smooth native scrolling and eliminate bounce effect */
+    body, .stApp { 
+        -webkit-overflow-scrolling: touch !important; 
+        overscroll-behavior-y: none;
+    }
+    
     div[data-testid="stVerticalBlock"] > div:first-child { padding-top: 0; }
     
     /* NAVBAR - JioHotstar Style */
