@@ -4,3 +4,5 @@ requests
 plotly
 urllib3
 streamlit-lottie
+scikit-learn
+numpy

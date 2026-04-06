@@ -6,12 +6,15 @@ import os
 import requests
 import time
 import urllib.parse
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from streamlit_lottie import st_lottie
+from ml_models import predict_sentiment, get_sentiment_confidence, predict_rating, get_feature_importance, get_model_stats
 
 # ==========================================
 # 1. CONFIGURATION
@@ -309,11 +312,123 @@ st.markdown("""
         box-shadow: none;
     }
     
-    /* Selectbox styling - JioHotstar */
+    /* ========================================== */
+    /* ANIMATED SEARCH BAR - Premium Glow Effect */
+    /* ========================================== */
+    
+    /* Rainbow border animation */
+    @keyframes rainbowBorder {
+        0% { border-color: #ff6b6b; box-shadow: 0 0 15px rgba(255, 107, 107, 0.5); }
+        20% { border-color: #feca57; box-shadow: 0 0 15px rgba(254, 202, 87, 0.5); }
+        40% { border-color: #48dbfb; box-shadow: 0 0 15px rgba(72, 219, 251, 0.5); }
+        60% { border-color: #ff9ff3; box-shadow: 0 0 15px rgba(255, 159, 243, 0.5); }
+        80% { border-color: #54a0ff; box-shadow: 0 0 15px rgba(84, 160, 255, 0.5); }
+        100% { border-color: #ff6b6b; box-shadow: 0 0 15px rgba(255, 107, 107, 0.5); }
+    }
+    
+    /* Pulsing glow animation */
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.3), 0 0 10px rgba(139, 92, 246, 0.2); }
+        50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 0 40px rgba(139, 92, 246, 0.3), 0 0 60px rgba(139, 92, 246, 0.1); }
+        100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.3), 0 0 10px rgba(139, 92, 246, 0.2); }
+    }
+    
+    /* Shimmer effect */
+    @keyframes searchShimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+    
+    /* Selectbox/Search styling - Animated */
     .stSelectbox > div > div {
         background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
-        border: 1px solid rgba(139, 92, 246, 0.2);
-        border-radius: 10px;
+        border: 2px solid rgba(139, 92, 246, 0.3);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stSelectbox > div > div::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 200%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent);
+        animation: searchShimmer 3s ease-in-out infinite;
+        pointer-events: none;
+    }
+    
+    .stSelectbox > div > div:hover {
+        border-color: rgba(139, 92, 246, 0.6);
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3), 0 0 40px rgba(139, 92, 246, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #8b5cf6;
+        animation: pulseGlow 2s ease-in-out infinite, rainbowBorder 4s linear infinite;
+        transform: translateY(-2px);
+    }
+    
+    /* Search icon animation in sidebar */
+    section[data-testid="stSidebar"] .stSelectbox > div > div {
+        background: linear-gradient(145deg, rgba(26, 26, 46, 0.9) 0%, rgba(22, 33, 62, 0.9) 100%);
+        border: 2px solid rgba(139, 92, 246, 0.3);
+        border-radius: 14px;
+        backdrop-filter: blur(10px);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    section[data-testid="stSidebar"] .stSelectbox > div > div:hover {
+        border-color: #00d4ff;
+        box-shadow: 0 0 25px rgba(0, 212, 255, 0.4), 0 0 50px rgba(0, 212, 255, 0.2);
+        transform: scale(1.02);
+    }
+    
+    section[data-testid="stSidebar"] .stSelectbox > div > div:focus-within {
+        border-color: transparent;
+        background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+        animation: rainbowBorder 3s linear infinite;
+        box-shadow: 0 0 30px rgba(139, 92, 246, 0.5), inset 0 0 20px rgba(139, 92, 246, 0.1);
+    }
+    
+    /* Search input text styling */
+    .stSelectbox input {
+        color: #fff !important;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+    
+    .stSelectbox input::placeholder {
+        color: rgba(165, 180, 252, 0.7) !important;
+        font-style: italic;
+    }
+    
+    /* Dropdown menu styling */
+    .stSelectbox [data-baseweb="popover"] {
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.2);
+        backdrop-filter: blur(20px);
+    }
+    
+    .stSelectbox [data-baseweb="menu"] {
+        background: transparent !important;
+    }
+    
+    .stSelectbox [role="option"] {
+        transition: all 0.2s ease;
+        border-radius: 8px;
+        margin: 2px 4px;
+    }
+    
+    .stSelectbox [role="option"]:hover {
+        background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.1)) !important;
+        transform: translateX(5px);
     }
     
     /* Expander styling */
@@ -321,6 +436,13 @@ st.markdown("""
         background: rgba(139, 92, 246, 0.1);
         border-radius: 10px;
         border: 1px solid rgba(139, 92, 246, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: rgba(139, 92, 246, 0.2);
+        border-color: rgba(139, 92, 246, 0.4);
+        box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
     }
     
     /* Slider styling - JioHotstar */
@@ -344,14 +466,7 @@ st.markdown("""
         box-shadow: none;
     }
     
-    /* Selectbox styling */
-    .stSelectbox > div > div {
-        background: #1a1a1a;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-    }
-    
-    /* Expander styling */
+    /* Expander styling enhanced */
     .streamlit-expanderHeader {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 8px;
@@ -632,6 +747,124 @@ st.markdown("""
     .share-telegram {
         background: linear-gradient(135deg, #0088cc 0%, #006699 100%);
         color: white;
+    }
+    
+    /* ========================================== */
+    /* LIKE & WATCHLIST BUTTON ANIMATIONS */
+    /* ========================================== */
+    
+    /* Heart Burst Animation Container */
+    .heart-burst-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: 99999;
+        overflow: hidden;
+    }
+    
+    /* Floating Hearts Animation */
+    @keyframes floatHeart {
+        0% {
+            transform: translateY(0) scale(0) rotate(0deg);
+            opacity: 1;
+        }
+        50% {
+            opacity: 1;
+            transform: translateY(-150px) scale(1.2) rotate(15deg);
+        }
+        100% {
+            transform: translateY(-300px) scale(0.8) rotate(-15deg);
+            opacity: 0;
+        }
+    }
+    
+    .floating-heart {
+        position: absolute;
+        font-size: 2rem;
+        animation: floatHeart 1.5s ease-out forwards;
+        pointer-events: none;
+    }
+    
+    /* Like Button Pulse Animation */
+    @keyframes likePulse {
+        0% { transform: scale(1); }
+        25% { transform: scale(1.3); }
+        50% { transform: scale(0.95); }
+        75% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+    }
+    
+    @keyframes likeGlow {
+        0% { box-shadow: 0 0 5px rgba(255, 71, 87, 0.5); }
+        50% { box-shadow: 0 0 30px rgba(255, 71, 87, 0.8), 0 0 60px rgba(255, 71, 87, 0.4); }
+        100% { box-shadow: 0 0 5px rgba(255, 71, 87, 0.5); }
+    }
+    
+    .like-animate {
+        animation: likePulse 0.6s ease-in-out, likeGlow 0.8s ease-in-out;
+    }
+    
+    /* Watchlist Star Burst Animation */
+    @keyframes starBurst {
+        0% { transform: scale(0) rotate(0deg); opacity: 1; }
+        50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+        100% { transform: scale(0) rotate(360deg); opacity: 0; }
+    }
+    
+    @keyframes watchlistGlow {
+        0% { box-shadow: 0 0 5px rgba(255, 107, 129, 0.5); }
+        50% { box-shadow: 0 0 30px rgba(255, 107, 129, 0.8), 0 0 60px rgba(255, 182, 193, 0.5); }
+        100% { box-shadow: 0 0 5px rgba(255, 107, 129, 0.5); }
+    }
+    
+    .watchlist-animate {
+        animation: likePulse 0.6s ease-in-out, watchlistGlow 0.8s ease-in-out;
+    }
+    
+    /* Confetti Particle */
+    @keyframes confettiFall {
+        0% {
+            transform: translateY(0) rotate(0deg) scale(1);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(200px) rotate(720deg) scale(0);
+            opacity: 0;
+        }
+    }
+    
+    .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        animation: confettiFall 1.5s ease-out forwards;
+        pointer-events: none;
+    }
+    
+    /* Sparkle Animation */
+    @keyframes sparkleAnim2 {
+        0% { transform: scale(0) rotate(0deg); opacity: 0; }
+        50% { transform: scale(1) rotate(180deg); opacity: 1; }
+        100% { transform: scale(0) rotate(360deg); opacity: 0; }
+    }
+    
+    .sparkle-effect {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background: radial-gradient(circle, #fff 0%, transparent 70%);
+        border-radius: 50%;
+        animation: sparkleAnim2 0.8s ease-out forwards;
+        pointer-events: none;
+    }
+    
+    /* Success Toast Animation Enhancement */
+    .stToast {
+        animation: slideUp 0.4s ease-out, likeGlow 0.6s ease-in-out;
     }
     
     /* ========================================== */
@@ -1005,11 +1238,8 @@ def save_feedback(u,m,f):
     new=pd.DataFrame({'username':[u],'movie':[m],'feedback':[f],'date':[str(datetime.now().date())]}); df=pd.concat([df,new],ignore_index=True); df.to_csv('feedback.csv',index=False)
 
 def analyze_sentiment(text):
-    text = text.lower()
-    pos = ['good', 'great', 'awesome', 'excellent', 'love', 'amazing', 'best', 'fantastic']
-    neg = ['bad', 'worst', 'terrible', 'boring', 'awful', 'hate', 'poor', 'stupid']
-    score = sum([1 for w in pos if w in text]) - sum([1 for w in neg if w in text])
-    return "Positive" if score > 0 else "Negative" if score < 0 else "Neutral"
+    """ML-powered sentiment analysis using trained Naive Bayes model."""
+    return predict_sentiment(text)
 
 def add_review(u, m, r, text):
     create_dbs(); sentiment = analyze_sentiment(text); df = pd.read_csv('reviews.csv')
@@ -1041,19 +1271,50 @@ def add_to_recently_viewed(movie_id, title):
 # 4. DATA ENGINE
 # ==========================================
 session = requests.Session()
-retry_strategy = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["HEAD", "GET", "OPTIONS"])
-adapter = HTTPAdapter(max_retries=retry_strategy)
+retry_strategy = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["HEAD", "GET", "OPTIONS"])
+adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=20)
 session.mount("https://", adapter)
 session.mount("http://", adapter)
 
-@st.cache_data(ttl=3600)
+# Poster cache to avoid re-fetching failed posters every reload
+if 'poster_cache' not in st.session_state:
+    st.session_state.poster_cache = {}
+if 'poster_cache_time' not in st.session_state:
+    st.session_state.poster_cache_time = {}
+
+def _get_placeholder(title):
+    clean_title = urllib.parse.quote(str(title)[:30])
+    return f"https://placehold.co/500x750/1a1a2e/a5b4fc?text={clean_title}&font=outfit"
+
+def _test_api_connectivity():
+    """Quick check if TMDB API is reachable"""
+    try:
+        r = session.get(f"https://api.themoviedb.org/3/configuration?api_key={API_KEY}", timeout=8)
+        return r.status_code == 200
+    except:
+        return False
+
+# Check API on startup and clear stale caches if API is back
+if 'api_checked' not in st.session_state:
+    st.session_state.api_checked = True
+    if _test_api_connectivity():
+        # API is working, clear any cached placeholder results
+        st.session_state.poster_cache = {}
+        st.session_state.poster_cache_time = {}
+        # Clear Streamlit's internal cache for poster functions so fresh data loads
+        try:
+            fetch_poster_only.clear()
+            fetch_full_details.clear()
+        except NameError:
+            pass
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def fetch_poster_only(movie_id, title="Movie"):
-    clean_title = urllib.parse.quote(str(title))
-    placeholder = f"https://placehold.co/500x750/1f1f1f/FFFFFF?text={clean_title}"
+    placeholder = _get_placeholder(title)
     try:
         mid = int(float(movie_id))
         url = f"https://api.themoviedb.org/3/movie/{mid}?api_key={API_KEY}&language=en-US"
-        response = session.get(url, timeout=5)
+        response = session.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get('poster_path'):
@@ -1074,7 +1335,7 @@ def extract_strict_certification(release_dates):
     found_certs.sort(key=lambda x: ranking_map.get(x, 0), reverse=True)
     return found_certs[0]
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800, show_spinner=False)
 def fetch_full_details(movie_id, title="Movie"):
     poster = fetch_poster_only(movie_id, title)
     clean_title = urllib.parse.quote(str(title))
@@ -1084,7 +1345,7 @@ def fetch_full_details(movie_id, title="Movie"):
     try:
         mid = int(float(movie_id))
         url = f"https://api.themoviedb.org/3/movie/{mid}?api_key={API_KEY}&append_to_response=credits,videos,watch/providers,release_dates"
-        response = session.get(url, timeout=5)
+        response = session.get(url, timeout=10)
         if response.status_code == 200:
             main = response.json()
             api_is_adult = main.get('adult', False)
@@ -1093,7 +1354,7 @@ def fetch_full_details(movie_id, title="Movie"):
             if 'credits' in main:
                 if 'cast' in main['credits']:
                     for c in main['credits']['cast'][:6]:
-                        pic = "https://image.tmdb.org/t/p/w200" + c['profile_path'] if c.get('profile_path') else f"https://via.placeholder.com/200?text={urllib.parse.quote(c['name'])}"
+                        pic = "https://image.tmdb.org/t/p/w200" + c['profile_path'] if c.get('profile_path') else f"https://placehold.co/200x200/1a1a2e/a5b4fc?text={urllib.parse.quote(c['name'].split()[0])}"
                         cast_rich.append({'name': c['name'], 'photo': pic})
                 if 'crew' in main['credits']:
                     director = next((x['name'] for x in main['credits']['crew'] if x['job'] == 'Director'), "Unknown")
@@ -1115,14 +1376,15 @@ def load_data():
         if not os.path.exists('movie_list.pkl'): return None, None
         movies_dict = pickle.load(open('movie_list.pkl','rb'))
         
-        # Load similarity matrix (compressed or regular)
+        # Use compressed similarity file for GitHub (under 100MB limit)
         import gzip
-        similarity = None
         if os.path.exists('similarity.pkl.gz'):
             with gzip.open('similarity.pkl.gz', 'rb') as f:
                 similarity = pickle.load(f)
         elif os.path.exists('similarity.pkl'):
             similarity = pickle.load(open('similarity.pkl','rb'))
+        else:
+            similarity = None
             
         movies = pd.DataFrame(movies_dict)
         movies['year_int'] = pd.to_datetime(movies['release_date'], errors='coerce').dt.year.fillna(0).astype(int)
@@ -1151,7 +1413,7 @@ def process_movie_for_ui(row):
     if not final_cast and 'top_cast' in row:
         local_cast = row.top_cast if isinstance(row.top_cast, list) else []
         for actor_name in local_cast[:6]: 
-            final_cast.append({'name': actor_name, 'photo': "https://via.placeholder.com/200?text=" + actor_name.split()[0]})
+            final_cast.append({'name': actor_name, 'photo': "https://placehold.co/200x200/1a1a2e/a5b4fc?text=" + urllib.parse.quote(actor_name.split()[0])})
     
     # Currency formatter with USD and INR
     def fmt_curr(val): 
@@ -1197,7 +1459,7 @@ def recommend(movie_title):
         idx = movies[movies['title'] == movie_title].index[0]
         distances = similarity[idx]
         m_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             results = list(executor.map(process_grid_item, [movies.iloc[i[0]] for i in m_list]))
         return results
     except: return []
@@ -1233,10 +1495,11 @@ def display_movies_grid(movies_to_show):
         for idx, data in enumerate(batch):
             with cols[idx]:
                 link_url = f"?id={data['id']}&user={st.session_state.username}"
+                fallback_poster = _get_placeholder(data['title'])
                 st.markdown(f"""
                 <a href="{link_url}" target="_self" style="text-decoration:none;">
                     <div class="movie-card">
-                        <img src="{data['poster']}">
+                        <img src="{data['poster']}" loading="lazy" onerror="this.onerror=null; this.src='{fallback_poster}';">
                         <div class="card-content">
                             <div class="card-title">{data['title']}</div>
                             <div class="card-meta">{data['rating']}</div>
@@ -1403,6 +1666,7 @@ else:
             st.button("🕐 Recently Viewed", use_container_width=True, on_click=set_page, args=('recent',))
             st.button("❤️ Watchlist", use_container_width=True, on_click=set_page, args=('watchlist',))
             st.button("👍 Liked", use_container_width=True, on_click=set_page, args=('liked',))
+            st.button("🧠 ML Insights", use_container_width=True, on_click=set_page, args=('ml_insights',))
             if st.session_state.username == 'admin': 
                 if st.button("📊 Admin Dashboard", use_container_width=True): st.session_state.page='admin'; st.session_state.view_mode='grid'; st.rerun()
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1412,7 +1676,7 @@ else:
                     for sublist in movies['genres_list']:
                         if isinstance(sublist, list):
                             for g in sublist: all_genres.add(g)
-                    genre_options = ["All", "Bollywood", "Adult"] + sorted(list(all_genres))
+                    genre_options = ["All", "Adult"] + sorted(list(all_genres))
                     sel_g = st.selectbox("By Genre", genre_options)
                     st.markdown("#### Year Range")
                     min_yr, max_yr = st.slider("Year", 1950, 2024, (1990, 2024))
@@ -1430,20 +1694,11 @@ else:
         else:
             if st.session_state.view_mode == 'detail' and st.session_state.detail_movie:
                 m = st.session_state.detail_movie
-                
-                # CINEMATCH Header Bar
-                st.markdown(f'''
-                <div class="nav-header">
-                    <div class="logo">CINEMATCH</div>
-                    <div class="user-badge">👤 {st.session_state.username}</div>
-                </div>
-                ''', unsafe_allow_html=True)
-                
                 back_label = "← Back"
                 if st.session_state.page == 'home': back_label = "← Back to Home"
                 elif st.session_state.page == 'genre': back_label = f"← Back to {st.session_state.selected_genre}"
                 elif st.session_state.page == 'search': back_label = "← Back to Search Results"
-                if st.button(back_label, type="primary"): go_grid(); st.rerun()
+                if st.button(back_label, type="secondary"): go_grid(); st.rerun()
                 st.markdown(f"""
                 <div class="hero-container" style="background-image: url('{m['backdrop']}');">
                     <div class="hero-overlay">
@@ -1462,6 +1717,32 @@ else:
                         </div>
                 </div>
                 </div>""", unsafe_allow_html=True)
+                
+                # AI PREDICTED RATING
+                try:
+                    movie_row = movies[movies['movie_id'] == m['id']].iloc[0]
+                    ai_pred = predict_rating(movie_row)
+                    if ai_pred:
+                        pred_val = ai_pred['predicted_rating']
+                        actual_val = m.get('vote_avg', 0)
+                        diff = abs(pred_val - actual_val) if actual_val > 0 else 0
+                        accuracy_color = '#34d399' if diff < 1 else '#fbbf24' if diff < 2 else '#f87171'
+                        st.markdown(f'''
+                        <div style="background: linear-gradient(145deg, rgba(139, 92, 246, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%); 
+                                    border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 20px; margin: 15px 0;
+                                    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                            <div style="font-size: 2rem;">🤖</div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.75rem; color: #a5b4fc; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">AI Predicted Rating</div>
+                                <div style="font-size: 1.8rem; font-weight: 800; color: #fff;">{pred_val}/10
+                                    <span style="font-size: 0.9rem; color: {accuracy_color}; margin-left: 10px;">vs Actual: {actual_val}/10</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Predicted by Random Forest model | Confidence: {ai_pred["confidence"]}</div>
+                            </div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                except Exception:
+                    pass
                 
                 # Main content columns
                 col_left, col_right = st.columns([3, 2], gap="large")
@@ -1554,19 +1835,78 @@ else:
                     revs = get_reviews(m['title'])
                     if not revs.empty:
                         for _, r in revs.iterrows():
-                            st.markdown(f"""<div class="review-card"><strong>{r['username']}</strong> <span class="sentiment-pos">{r['sentiment']}</span><div style="margin-top:5px; color:#ddd;">"{r['review']}"</div></div>""", unsafe_allow_html=True)
+                            sent = r['sentiment']
+                            sent_color = '#34d399' if sent == 'Positive' else '#f87171' if sent == 'Negative' else '#fbbf24'
+                            sent_icon = '😊' if sent == 'Positive' else '😞' if sent == 'Negative' else '😐'
+                            # Get ML confidence for this review
+                            confidence_info = get_sentiment_confidence(str(r['review']))
+                            conf_pct = confidence_info.get('confidence', 0)
+                            st.markdown(f"""
+                            <div class="review-card">
+                                <strong>{r['username']}</strong> 
+                                <span style="color:{sent_color}; font-weight: bold; font-size: 0.8rem; float: right;">
+                                    {sent_icon} {sent} ({conf_pct}% confidence)
+                                </span>
+                                <div style="margin-top:5px; color:#ddd;">"{r['review']}"</div>
+                            </div>""", unsafe_allow_html=True)
                     else: 
                         st.caption("No reviews yet. Be the first to review!")
                 
                 with col_right:
-                    # ACTION BUTTONS
+                    # ACTION BUTTONS WITH ANIMATIONS
                     c1, c2 = st.columns(2)
                     with c1:
-                        if st.button("❤️ Watchlist", use_container_width=True): 
-                            add_to_watchlist(st.session_state.username, m['title']); st.toast("Added to Watchlist!")
+                        if st.button("❤️ Watchlist", use_container_width=True, key="watchlist_btn"): 
+                            add_to_watchlist(st.session_state.username, m['title'])
+                            # Trigger heart burst animation
+                            st.markdown('''
+                            <div class="heart-burst-container" id="watchlist-anim">
+                                <div class="floating-heart" style="left: 20%; animation-delay: 0s;">💖</div>
+                                <div class="floating-heart" style="left: 30%; animation-delay: 0.1s;">❤️</div>
+                                <div class="floating-heart" style="left: 40%; animation-delay: 0.2s;">💕</div>
+                                <div class="floating-heart" style="left: 50%; animation-delay: 0.15s;">💗</div>
+                                <div class="floating-heart" style="left: 60%; animation-delay: 0.25s;">💖</div>
+                                <div class="floating-heart" style="left: 70%; animation-delay: 0.1s;">❤️</div>
+                                <div class="floating-heart" style="left: 80%; animation-delay: 0.2s;">💕</div>
+                            </div>
+                            <script>
+                                setTimeout(() => {
+                                    const anim = document.getElementById('watchlist-anim');
+                                    if(anim) anim.remove();
+                                }, 2000);
+                            </script>
+                            ''', unsafe_allow_html=True)
+                            st.toast("💖 Added to Watchlist!")
                     with c2:
-                        if st.button("👍 Like", use_container_width=True): 
-                            save_feedback(st.session_state.username, m['title'], "Like"); st.toast("Liked!")
+                        if st.button("👍 Like", use_container_width=True, key="like_btn"): 
+                            save_feedback(st.session_state.username, m['title'], "Like")
+                            # Trigger confetti + thumbs up animation
+                            st.markdown('''
+                            <div class="heart-burst-container" id="like-anim">
+                                <div class="floating-heart" style="left: 15%; animation-delay: 0s;">👍</div>
+                                <div class="floating-heart" style="left: 25%; animation-delay: 0.1s;">⭐</div>
+                                <div class="floating-heart" style="left: 35%; animation-delay: 0.15s;">✨</div>
+                                <div class="floating-heart" style="left: 45%; animation-delay: 0.05s;">🎉</div>
+                                <div class="floating-heart" style="left: 55%; animation-delay: 0.2s;">👍</div>
+                                <div class="floating-heart" style="left: 65%; animation-delay: 0.1s;">⭐</div>
+                                <div class="floating-heart" style="left: 75%; animation-delay: 0.15s;">✨</div>
+                                <div class="floating-heart" style="left: 85%; animation-delay: 0.25s;">🎉</div>
+                                <div class="confetti" style="left: 20%; top: 40%; background: #ff6b6b;"></div>
+                                <div class="confetti" style="left: 30%; top: 35%; background: #4ecdc4; animation-delay: 0.1s;"></div>
+                                <div class="confetti" style="left: 40%; top: 45%; background: #ffe66d; animation-delay: 0.2s;"></div>
+                                <div class="confetti" style="left: 50%; top: 38%; background: #95e1d3; animation-delay: 0.15s;"></div>
+                                <div class="confetti" style="left: 60%; top: 42%; background: #f38181; animation-delay: 0.25s;"></div>
+                                <div class="confetti" style="left: 70%; top: 36%; background: #aa96da; animation-delay: 0.1s;"></div>
+                                <div class="confetti" style="left: 80%; top: 44%; background: #fcbad3; animation-delay: 0.2s;"></div>
+                            </div>
+                            <script>
+                                setTimeout(() => {
+                                    const anim = document.getElementById('like-anim');
+                                    if(anim) anim.remove();
+                                }, 2000);
+                            </script>
+                            ''', unsafe_allow_html=True)
+                            st.toast("👍 Liked!")
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
@@ -1657,9 +1997,9 @@ else:
                     st.error(f"Error loading users: {e}")
             else:
                 if st.session_state.page == 'home':
-                    st.markdown("### 🔥 Trending Now")
+                    st.markdown("### 🏆 Top Rated")
                     top_df = get_top_movies()
-                    with ThreadPoolExecutor(max_workers=3) as executor:
+                    with ThreadPoolExecutor(max_workers=5) as executor:
                         movies_to_show = list(executor.map(process_grid_item, [row for _, row in top_df.iterrows()]))
                     display_movies_grid(movies_to_show)
                 elif st.session_state.page == 'recent':
@@ -1667,7 +2007,7 @@ else:
                     if st.session_state.recently_viewed:
                         recent_ids = [r['id'] for r in st.session_state.recently_viewed]
                         sub_df = movies[movies['movie_id'].isin(recent_ids)]
-                        with ThreadPoolExecutor(max_workers=3) as executor:
+                        with ThreadPoolExecutor(max_workers=5) as executor:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         display_movies_grid(movies_to_show)
                     else: st.info("No recently viewed movies.")
@@ -1676,7 +2016,7 @@ else:
                     if g == "All": sub_df = movies.head(20)
                     elif g == "Adult": sub_df = movies[movies['adult'] == True].head(20) if 'adult' in movies.columns else pd.DataFrame()
                     else: sub_df = movies[movies['genres_list'].apply(lambda x: g in x if isinstance(x, list) else False)].head(20)
-                    with ThreadPoolExecutor(max_workers=3) as executor:
+                    with ThreadPoolExecutor(max_workers=5) as executor:
                         movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                     st.markdown(f"### 📂 Genre: {g}"); display_movies_grid(movies_to_show)
                 elif st.session_state.page == 'filtered':
@@ -1684,15 +2024,12 @@ else:
                     min_y, max_y = st.session_state.min_year, st.session_state.max_year
                     min_r = st.session_state.min_rating
                     sub_df = movies[(movies['year_int'] >= min_y) & (movies['year_int'] <= max_y) & (movies['vote_average'] * 10 >= min_r)]
-                    if g == "Bollywood":
-                        # Filter by Hindi language
-                        sub_df = sub_df[sub_df['original_language'] == 'hi'] if 'original_language' in sub_df.columns else sub_df
+                    if g != "All" and g != "Adult":
+                        sub_df = sub_df[sub_df['genres_list'].apply(lambda x: g in x if isinstance(x, list) else False)]
                     elif g == "Adult":
                         sub_df = sub_df[sub_df['adult'] == True] if 'adult' in sub_df.columns else pd.DataFrame()
-                    elif g != "All":
-                        sub_df = sub_df[sub_df['genres_list'].apply(lambda x: g in x if isinstance(x, list) else False)]
                     sub_df = sub_df.head(30)
-                    with ThreadPoolExecutor(max_workers=3) as executor:
+                    with ThreadPoolExecutor(max_workers=5) as executor:
                         movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                     st.markdown(f"### 🔍 Filtered Results ({len(movies_to_show)} movies)"); display_movies_grid(movies_to_show)
                 elif st.session_state.page == 'search':
@@ -1704,29 +2041,30 @@ else:
                             eg = process_grid_item(em)
                             cols = st.columns(5)
                             with cols[0]:
-                                st.markdown(f"""<a href="?id={eg['id']}&user={st.session_state.username}" target="_self" style="text-decoration:none;"><div class="movie-card"><img src="{eg['poster']}"><div class="card-content"><div class="card-title">{eg['title']}</div></div></div></a>""", unsafe_allow_html=True)
+                                fallback = _get_placeholder(eg['title'])
+                                st.markdown(f"""<a href="?id={eg['id']}&user={st.session_state.username}" target="_self" style="text-decoration:none;"><div class="movie-card"><img src="{eg['poster']}" loading="lazy" onerror="this.onerror=null; this.src='{fallback}';"><div class="card-content"><div class="card-title">{eg['title']}</div></div></div></a>""", unsafe_allow_html=True)
                             st.markdown(f"### Similar to {em['title']}"); recs = recommend(em['title']); display_movies_grid(recs)
                         else:
                             mask = movies['title'].str.contains(query, case=False, regex=False, na=False)
                             results = movies[mask].head(20)
-                            with ThreadPoolExecutor(max_workers=3) as executor:
+                            with ThreadPoolExecutor(max_workers=5) as executor:
                                 movies_to_show = list(executor.map(process_grid_item, [row for _, row in results.iterrows()]))
                             st.markdown(f"### Results for: {query}"); display_movies_grid(movies_to_show)
                     elif q_type == 'director':
                         sub_df = movies[movies['director'].apply(lambda x: query in str(x))]
-                        with ThreadPoolExecutor(max_workers=3) as executor:
+                        with ThreadPoolExecutor(max_workers=5) as executor:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         st.markdown(f"### Director: {query}"); display_movies_grid(movies_to_show)
                     elif q_type == 'actor':
                         sub_df = movies[movies['top_cast'].apply(lambda x: query in x if isinstance(x, list) else False)]
-                        with ThreadPoolExecutor(max_workers=3) as executor:
+                        with ThreadPoolExecutor(max_workers=5) as executor:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         st.markdown(f"### Actor: {query}"); display_movies_grid(movies_to_show)
                 elif st.session_state.page == 'watchlist':
                     wl = get_watchlist(st.session_state.username)
                     if not wl.empty:
                         sub_df = movies[movies['title'].isin(wl['movie'])]
-                        with ThreadPoolExecutor(max_workers=3) as executor:
+                        with ThreadPoolExecutor(max_workers=5) as executor:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         st.markdown("### ❤️ My Watchlist"); display_movies_grid(movies_to_show)
                     else: st.info("Watchlist is empty.")
@@ -1734,10 +2072,249 @@ else:
                     lk = get_liked_movies(st.session_state.username)
                     if not lk.empty:
                         sub_df = movies[movies['title'].isin(lk['movie'])]
-                        with ThreadPoolExecutor(max_workers=3) as executor:
+                        with ThreadPoolExecutor(max_workers=5) as executor:
                             movies_to_show = list(executor.map(process_grid_item, [row for _, row in sub_df.iterrows()]))
                         st.markdown("### 👍 Liked Movies"); display_movies_grid(movies_to_show)
                     else: st.info("No liked movies yet.")
+                elif st.session_state.page == 'ml_insights':
+                    st.markdown("### 🧠 ML Insights Dashboard")
+                    st.markdown("<p style='color: #a5b4fc; margin-bottom: 20px;'>Machine learning analytics powered by <b>Naive Bayes</b>, <b>Random Forest</b>, and <b>TF-IDF</b> models trained on your movie data.</p>", unsafe_allow_html=True)
+                    
+                    # Model Status Cards
+                    stats = get_model_stats()
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        status = '🟢 Active' if stats.get('sentiment_model_exists') else '🔴 Not Trained'
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <div class="info-label">Sentiment Model</div>
+                            <div class="info-val">{status}</div>
+                            <div style="color: #a5b4fc; font-size: 0.8rem;">Naive Bayes + TF-IDF</div>
+                        </div>""", unsafe_allow_html=True)
+                    with c2:
+                        status = '🟢 Active' if stats.get('rating_model_exists') else '🔴 Not Trained'
+                        rmse = stats.get('rating_rmse', 'N/A')
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <div class="info-label">Rating Predictor</div>
+                            <div class="info-val">{status}</div>
+                            <div style="color: #a5b4fc; font-size: 0.8rem;">Random Forest | RMSE: {rmse}</div>
+                        </div>""", unsafe_allow_html=True)
+                    with c3:
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <div class="info-label">Recommendation Engine</div>
+                            <div class="info-val">🟢 TF-IDF Active</div>
+                            <div style="color: #a5b4fc; font-size: 0.8rem;">Cosine Similarity + Bigrams</div>
+                        </div>""", unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # --- Chart 1: Genre Popularity Over Decades ---
+                    st.markdown("### 📊 Genre Popularity Over Decades")
+                    try:
+                        movies_copy = movies.copy()
+                        movies_copy['year'] = pd.to_datetime(movies_copy['release_date'], errors='coerce').dt.year
+                        movies_copy = movies_copy.dropna(subset=['year'])
+                        movies_copy['decade'] = (movies_copy['year'] // 10 * 10).astype(int).astype(str) + 's'
+                        
+                        genre_decade = []
+                        for _, row in movies_copy.iterrows():
+                            if isinstance(row['genres_list'], list):
+                                for g in row['genres_list']:
+                                    genre_decade.append({'decade': row['decade'], 'genre': g})
+                        
+                        gd_df = pd.DataFrame(genre_decade)
+                        if not gd_df.empty:
+                            gd_counts = gd_df.groupby(['decade', 'genre']).size().reset_index(name='count')
+                            top_genres = gd_df['genre'].value_counts().head(8).index.tolist()
+                            gd_filtered = gd_counts[gd_counts['genre'].isin(top_genres)]
+                            
+                            fig_genre = px.bar(
+                                gd_filtered, x='decade', y='count', color='genre',
+                                title='How Movie Genres Changed Over Time',
+                                labels={'count': 'Number of Movies', 'decade': 'Decade', 'genre': 'Genre'},
+                                color_discrete_sequence=px.colors.qualitative.Set3,
+                                barmode='group'
+                            )
+                            fig_genre.update_layout(
+                                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                                font_color='#e0e7ff', title_font_size=16,
+                                legend=dict(orientation='h', yanchor='bottom', y=-0.3)
+                            )
+                            st.plotly_chart(fig_genre, use_container_width=True)
+                    except Exception as e:
+                        st.warning(f"Could not generate genre chart: {e}")
+                    
+                    st.markdown("---")
+                    
+                    # --- Chart 2: Top Directors by Average Rating ---
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown("### 🎬 Top Directors by Rating")
+                        try:
+                            dir_df = movies[movies['director'].notna() & (movies['director'] != 'Unknown')].copy()
+                            dir_stats = dir_df.groupby('director').agg(
+                                avg_rating=('vote_average', 'mean'),
+                                movie_count=('title', 'count')
+                            ).reset_index()
+                            dir_stats = dir_stats[dir_stats['movie_count'] >= 3]
+                            dir_stats = dir_stats.sort_values('avg_rating', ascending=False).head(10)
+                            dir_stats['avg_rating'] = dir_stats['avg_rating'].round(1)
+                            
+                            fig_dir = px.bar(
+                                dir_stats, x='avg_rating', y='director', orientation='h',
+                                title='Top 10 Directors (min 3 movies)',
+                                labels={'avg_rating': 'Average Rating', 'director': 'Director'},
+                                color='avg_rating',
+                                color_continuous_scale='Viridis',
+                                text='avg_rating'
+                            )
+                            fig_dir.update_layout(
+                                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                                font_color='#e0e7ff', title_font_size=14, yaxis={'categoryorder': 'total ascending'},
+                                coloraxis_showscale=False, height=400
+                            )
+                            fig_dir.update_traces(textposition='outside')
+                            st.plotly_chart(fig_dir, use_container_width=True)
+                        except Exception as e:
+                            st.warning(f"Could not generate director chart: {e}")
+                    
+                    # --- Chart 3: Movie Success Factors (Feature Importance) ---
+                    with col_b:
+                        st.markdown("### 🎯 Movie Success Factors")
+                        importance = get_feature_importance()
+                        if importance:
+                            feat_df = pd.DataFrame([
+                                {'Feature': k, 'Importance': v} for k, v in importance.items()
+                            ])
+                            fig_imp = px.pie(
+                                feat_df, values='Importance', names='Feature',
+                                title='What Determines a Movie Rating?',
+                                color_discrete_sequence=px.colors.sequential.Purples_r,
+                                hole=0.4
+                            )
+                            fig_imp.update_layout(
+                                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                                font_color='#e0e7ff', title_font_size=14, height=400
+                            )
+                            fig_imp.update_traces(textinfo='label+percent', textfont_size=11)
+                            st.plotly_chart(fig_imp, use_container_width=True)
+                        else:
+                            st.info("Train the rating predictor model to see feature importance.")
+                    
+                    st.markdown("---")
+                    
+                    # --- Chart 4: User Taste Profile ---
+                    col_c, col_d = st.columns(2)
+                    with col_c:
+                        st.markdown("### 👤 Your Taste Profile")
+                        try:
+                            wl = get_watchlist(st.session_state.username)
+                            lk = get_liked_movies(st.session_state.username)
+                            user_movies = pd.concat([wl['movie'] if not wl.empty else pd.Series(dtype=str), lk['movie'] if not lk.empty else pd.Series(dtype=str)]).unique()
+                            
+                            if len(user_movies) > 0:
+                                user_df = movies[movies['title'].isin(user_movies)]
+                                user_genres = []
+                                for _, row in user_df.iterrows():
+                                    if isinstance(row['genres_list'], list):
+                                        user_genres.extend(row['genres_list'])
+                                
+                                if user_genres:
+                                    genre_counts = pd.Series(user_genres).value_counts().head(8)
+                                    fig_taste = go.Figure(data=go.Scatterpolar(
+                                        r=genre_counts.values,
+                                        theta=genre_counts.index,
+                                        fill='toself',
+                                        fillcolor='rgba(139, 92, 246, 0.3)',
+                                        line=dict(color='#8b5cf6', width=2),
+                                        marker=dict(size=8, color='#a78bfa')
+                                    ))
+                                    fig_taste.update_layout(
+                                        polar=dict(
+                                            bgcolor='rgba(0,0,0,0)',
+                                            radialaxis=dict(visible=True, gridcolor='rgba(139, 92, 246, 0.2)'),
+                                            angularaxis=dict(gridcolor='rgba(139, 92, 246, 0.2)')
+                                        ),
+                                        paper_bgcolor='rgba(0,0,0,0)',
+                                        font_color='#e0e7ff', height=400,
+                                        title='Your Genre Preferences'
+                                    )
+                                    st.plotly_chart(fig_taste, use_container_width=True)
+                                else:
+                                    st.info("Add movies to your watchlist or likes to see your taste profile!")
+                            else:
+                                st.info("Add movies to your watchlist or likes to see your taste profile!")
+                        except Exception as e:
+                            st.info("Add movies to your watchlist or likes to see your taste profile!")
+                    
+                    # --- Chart 5: Sentiment Distribution ---
+                    with col_d:
+                        st.markdown("### 💬 Review Sentiment Distribution")
+                        try:
+                            reviews_df = pd.read_csv('reviews.csv')
+                            if not reviews_df.empty and 'sentiment' in reviews_df.columns:
+                                sent_counts = reviews_df['sentiment'].value_counts()
+                                colors = {'Positive': '#34d399', 'Negative': '#f87171', 'Neutral': '#fbbf24'}
+                                color_list = [colors.get(s, '#94a3b8') for s in sent_counts.index]
+                                
+                                fig_sent = go.Figure(data=[go.Pie(
+                                    labels=sent_counts.index,
+                                    values=sent_counts.values,
+                                    hole=0.5,
+                                    marker=dict(colors=color_list),
+                                    textinfo='label+percent+value',
+                                    textfont_size=12
+                                )])
+                                fig_sent.update_layout(
+                                    paper_bgcolor='rgba(0,0,0,0)',
+                                    font_color='#e0e7ff', height=400,
+                                    title='All User Reviews by Sentiment'
+                                )
+                                st.plotly_chart(fig_sent, use_container_width=True)
+                            else:
+                                st.info("No reviews yet. Submit reviews to see sentiment analysis!")
+                        except Exception:
+                            st.info("No reviews yet. Submit reviews to see sentiment analysis!")
+                    
+                    st.markdown("---")
+                    
+                    # --- Live Sentiment Tester ---
+                    st.markdown("### 🔬 Live Sentiment Analyzer")
+                    st.markdown("<p style='color: #a5b4fc;'>Test the ML sentiment model in real-time! Type any movie review and see how the Naive Bayes classifier analyzes it.</p>", unsafe_allow_html=True)
+                    test_text = st.text_area("Enter a review to analyze:", height=100, placeholder="e.g., This movie was absolutely brilliant with stunning visuals...")
+                    if test_text:
+                        result = get_sentiment_confidence(test_text)
+                        sent = result['sentiment']
+                        conf = result['confidence']
+                        pos_prob = result['positive_prob']
+                        neg_prob = result['negative_prob']
+                        sent_emoji = '😊' if sent == 'Positive' else '😞' if sent == 'Negative' else '😐'
+                        sent_color = '#34d399' if sent == 'Positive' else '#f87171' if sent == 'Negative' else '#fbbf24'
+                        
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(145deg, rgba(26, 26, 46, 0.9) 0%, rgba(22, 33, 62, 0.9) 100%);
+                                    border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; padding: 25px; margin-top: 15px;">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                                <span style="font-size: 2.5rem;">{sent_emoji}</span>
+                                <div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: {sent_color};">{sent}</div>
+                                    <div style="color: #a5b4fc; font-size: 0.85rem;">ML Model Confidence: {conf}%</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 20px;">
+                                <div style="flex: 1; background: rgba(52, 211, 153, 0.1); border-radius: 10px; padding: 12px; text-align: center;">
+                                    <div style="color: #34d399; font-weight: 600;">Positive</div>
+                                    <div style="color: #fff; font-size: 1.2rem; font-weight: 700;">{pos_prob}%</div>
+                                </div>
+                                <div style="flex: 1; background: rgba(248, 113, 113, 0.1); border-radius: 10px; padding: 12px; text-align: center;">
+                                    <div style="color: #f87171; font-weight: 600;">Negative</div>
+                                    <div style="color: #fff; font-size: 1.2rem; font-weight: 700;">{neg_prob}%</div>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
             
             # Mobile Bottom Navigation Bar
             current_page = st.session_state.page
