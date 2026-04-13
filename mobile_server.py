@@ -38,7 +38,9 @@ tmdb_session = http_requests.Session()
 # DATA LOADING
 # ==========================================
 print("[*] Loading CineMatch data...")
-movies_path = os.path.join(BASE_DIR, 'movie_list.pkl')
+movies_path = os.path.join(BASE_DIR, 'movie_list_optimized.pkl')
+if not os.path.exists(movies_path):
+    movies_path = os.path.join(BASE_DIR, 'movie_list.pkl')
 movies_dict = pickle.load(open(movies_path, 'rb'))
 movies_df = pd.DataFrame(movies_dict)
 
@@ -52,9 +54,15 @@ if 'adult' not in movies_df.columns:
 print(f"   [OK] {len(movies_df)} movies loaded")
 
 similarity = None
+opt_path = os.path.join(BASE_DIR, 'similarity_optimized.pkl')
 gz_path = os.path.join(BASE_DIR, 'similarity.pkl.gz')
 pkl_path = os.path.join(BASE_DIR, 'similarity.pkl')
-if os.path.exists(gz_path):
+
+if os.path.exists(opt_path):
+    print("   Loading similarity (optimized map)...")
+    similarity = pickle.load(open(opt_path, 'rb'))
+    print("   [OK] Optimized Similarity dict loaded")
+elif os.path.exists(gz_path):
     print("   Loading similarity (compressed)...")
     with gzip.open(gz_path, 'rb') as f:
         similarity = pickle.load(f)
@@ -303,9 +311,20 @@ def api_rec(mid):
     if similarity is None:
         return jsonify([])
     try:
-        idx = movies_df[movies_df['movie_id'] == mid].index[0]
-        dists = sorted(list(enumerate(similarity[idx])), reverse=True, key=lambda x: x[1])[1:11]
-        sub = movies_df.iloc[[i[0] for i in dists]]
+        row = movies_df[movies_df['movie_id'] == mid]
+        if row.empty: return jsonify([])
+        
+        # Check if we are using the optimized dictionary or full matrix
+        if isinstance(similarity, dict):
+            title = row.iloc[0]['title']
+            dists = similarity.get(title, [])
+            if not dists: return jsonify([])
+            sub = movies_df.iloc[dists]
+        else:
+            idx = row.index[0]
+            dists = sorted(list(enumerate(similarity[idx])), reverse=True, key=lambda x: x[1])[1:11]
+            sub = movies_df.iloc[[i[0] for i in dists]]
+            
         return jsonify(cards_with_posters(sub, 10))
     except:
         return jsonify([])
