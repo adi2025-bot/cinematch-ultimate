@@ -1,0 +1,20 @@
+# Python and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Large Machine Learning Models
+similarity.pkl
+# (Note: we leave similarity.pkl.gz unmarked so it gets deployed since it's under 100MB)
+
+# Logs and databases
+*.sqlite3
+*.db
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

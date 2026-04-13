@@ -1,0 +1,20 @@
+{
+    "name": "CineMatch — Premium Entertainment",
+    "short_name": "CineMatch",
+    "description": "Movie recommendation app powered by Machine Learning",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f0c29",
+    "theme_color": "#0f0c29",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230f0c29' width='100' height='100' rx='20'/><text x='50' y='65' text-anchor='middle' font-size='55'>🍿</text></svg>",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["entertainment", "movies"],
+    "lang": "en"
+}
