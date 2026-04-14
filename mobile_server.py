@@ -155,7 +155,12 @@ def extract_cert(release_dates):
 # ==========================================
 @app.route('/')
 def index():
-    return render_template('index.html')
+    from flask import make_response
+    r = make_response(render_template('index.html'))
+    r.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    r.headers['Pragma'] = 'no-cache'
+    r.headers['Expires'] = '0'
+    return r
 
 @app.route('/manifest.json')
 def manifest():
@@ -340,7 +345,22 @@ def api_search():
         if t == 'movie':
             exact = movies_df[movies_df['title'].fillna('').str.lower() == q.lower()]
             if not exact.empty:
+                # Automatically append recommendations downstream
+                idx = exact.index[0]
+                recs = pd.DataFrame()
+                if isinstance(similarity, dict):
+                    title = exact.iloc[0]['title']
+                    dists = similarity.get(title, [])
+                    if dists: recs = movies_df.iloc[dists[:10]]
+                else:
+                    dists = sorted(list(enumerate(similarity[idx])), reverse=True, key=lambda x: x[1])[1:11]
+                    recs = movies_df.iloc[[i[0] for i in dists]]
+                
+                if not recs.empty:
+                    combined = pd.concat([exact, recs])
+                    return jsonify(cards_with_posters(combined, 11))
                 return jsonify(cards_with_posters(exact, 1))
+            
             partial = movies_df[movies_df['title'].fillna('').str.contains(q, case=False, regex=False)]
             return jsonify(cards_with_posters(partial, 20))
         elif t == 'director':
