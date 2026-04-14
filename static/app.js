@@ -8,6 +8,7 @@ const S = {
     user: null, role: null, page: 'login',
     detailData: null, detailId: null,
     searchQuery: '', searchType: 'movie',
+    filterGenre: '', filterYear: 0, filterRating: 0,
     recentlyViewed: JSON.parse(localStorage.getItem('cm_recent') || '[]'),
     genreList: [],
 };
@@ -67,10 +68,21 @@ function appShell(contentFn) {
             <div class="top-bar-logo">CINEMATCH</div>
             <div class="top-bar-user">👤 ${S.user}</div>
         </div>
+        ${S.page === 'search' ? `
+        <div class="search-bar" style="flex-wrap:wrap; gap:8px;">
+            <input class="search-input" id="searchInput" placeholder="Search..." value="${S.searchQuery || ''}">
+            <select id="searchTypeSel" class="form-select" style="width:110px; padding:12px; border-radius:12px; background:var(--bg-deep); color:white; border:1px solid var(--border);">
+                <option value="movie" ${S.searchType==='movie'?'selected':''}>Title</option>
+                <option value="actor" ${S.searchType==='actor'?'selected':''}>Actor</option>
+                <option value="director" ${S.searchType==='director'?'selected':''}>Director</option>
+            </select>
+            <input type="number" id="filterYear" class="search-input" placeholder="Min Year" style="max-width:100px; padding:12px;" value="${S.filterYear || ''}">
+            <button class="search-btn" id="searchBtn">🔍 Go</button>
+        </div>` : `
         <div class="search-bar">
             <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${S.searchQuery || ''}">
             <button class="search-btn" id="searchBtn">🔍 Go</button>
-        </div>
+        </div>`}
         <div id="content">${contentFn()}</div>
         <div class="bottom-nav">
             <button class="nav-btn ${S.page === 'home' ? 'active' : ''}" onclick="navigate('home')"><span class="nav-icon">🏠</span>Home</button>
@@ -128,12 +140,18 @@ function splashPage() {
 
 // ===== HOME PAGE =====
 function homePage() {
-    return `<div class="section-title">🏆 Top Rated</div><div id="movieGrid" class="movie-grid">${loadingCards(12)}</div>`;
+    return `<div class="genre-scroll-container" id="genreContainer"></div>
+    <div class="section-title">🏆 Top Rated</div><div id="movieGrid" class="movie-grid">${loadingCards(12)}</div>`;
 }
 
 // ===== SEARCH PAGE =====
 function searchPage() {
-    return `<div class="section-title">🔍 Results for "${S.searchQuery}"</div><div id="movieGrid" class="movie-grid">${loadingCards(9)}</div>`;
+    let subtitle = S.searchQuery ? `"${S.searchQuery}"` : '';
+    if (S.filterGenre) subtitle += ` (Genre: ${S.filterGenre})`;
+    return `<div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>🔍 Results for ${subtitle || 'All Movies'}</div>
+        <button class="nav-btn" style="background:var(--card-bg); padding:8px 16px; border-radius:12px; color:white; border:1px solid var(--border)" onclick="navigate('home')">⬅ Back</button>
+    </div><div id="movieGrid" class="movie-grid">${loadingCards(9)}</div>`;
 }
 
 // ===== WATCHLIST PAGE =====
@@ -373,11 +391,25 @@ function logout() {
     navigate('login');
 }
 
-// ===== SEARCH =====
+// ===== SEARCH & FILTERS =====
 function handleSearch() {
-    const q = document.getElementById('searchInput')?.value?.trim();
-    if (!q) return;
-    navigate('search', { searchQuery: q, searchType: 'movie' });
+    const q = document.getElementById('searchInput')?.value?.trim() || '';
+    const t = document.getElementById('searchTypeSel')?.value || 'movie';
+    if (!q && !S.filterGenre && !S.filterYear && !S.filterRating) return;
+    navigate('search', { searchQuery: q, searchType: t });
+}
+
+function applyFilters() {
+    S.searchType = document.getElementById('searchTypeSel')?.value || 'movie';
+    S.filterYear = document.getElementById('filterYear')?.value || 0;
+    S.filterRating = document.getElementById('filterRating')?.value || 0;
+    navigate('search');
+}
+
+function filterByGenre(g) {
+    S.filterGenre = g;
+    S.searchQuery = ''; // Clear text query when clicking genre
+    navigate('search');
 }
 
 // ===== MOVIE ACTIONS =====

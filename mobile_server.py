@@ -335,18 +335,24 @@ def api_search():
     t = request.args.get('type', 'movie')
     if not q:
         return jsonify([])
-    if t == 'movie':
-        exact = movies_df[movies_df['title'].str.lower() == q.lower()]
-        if not exact.empty:
-            return jsonify(cards_with_posters(exact, 1))
-        partial = movies_df[movies_df['title'].str.contains(q, case=False, regex=False, na=False)]
-        return jsonify(cards_with_posters(partial, 20))
-    elif t == 'director':
-        sub = movies_df[movies_df['director'].apply(lambda x: q.lower() in str(x).lower())]
-        return jsonify(cards_with_posters(sub, 20))
-    elif t == 'actor':
-        sub = movies_df[movies_df['top_cast'].apply(lambda x: any(q.lower() in a.lower() for a in x) if isinstance(x, list) else False)]
-        return jsonify(cards_with_posters(sub, 20))
+    try:
+        # Use fillna('') to prevent NaN eval errors in pandas
+        if t == 'movie':
+            exact = movies_df[movies_df['title'].fillna('').str.lower() == q.lower()]
+            if not exact.empty:
+                return jsonify(cards_with_posters(exact, 1))
+            partial = movies_df[movies_df['title'].fillna('').str.contains(q, case=False, regex=False)]
+            return jsonify(cards_with_posters(partial, 20))
+        elif t == 'director':
+            sub = movies_df[movies_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
+            return jsonify(cards_with_posters(sub, 20))
+        elif t == 'actor':
+            sub = movies_df[movies_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
+            return jsonify(cards_with_posters(sub, 20))
+    except Exception as e:
+        print(f"Search API Error: {e}")
+        return jsonify([])
+    return jsonify([])
     return jsonify([])
 
 @app.route('/api/movies/filter')
