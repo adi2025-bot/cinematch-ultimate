@@ -373,7 +373,6 @@ def api_search():
         print(f"Search API Error: {e}")
         return jsonify([])
     return jsonify([])
-    return jsonify([])
 
 @app.route('/api/movies/filter')
 def api_filter():

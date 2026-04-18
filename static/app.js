@@ -1,6 +1,6 @@
 /**
  * CineMatch Mobile — Single Page Application
- * Premium movie recommendation PWA
+ * Premium movie recommendation PWA — Full Feature Parity with Desktop
  */
 
 // ===== STATE =====
@@ -11,6 +11,7 @@ const S = {
     filterGenre: '', filterYear: 0, filterRating: 0,
     recentlyViewed: JSON.parse(localStorage.getItem('cm_recent') || '[]'),
     genreList: [],
+    trailerPlaying: false,
 };
 
 // ===== API HELPER =====
@@ -51,6 +52,7 @@ function render() {
         case 'detail': html = appShell(detailPage); break;
         case 'watchlist': html = appShell(watchlistPage); break;
         case 'liked': html = appShell(likedPage); break;
+        case 'recently': html = appShell(recentPage); break;
         case 'insights': html = appShell(insightsPage); break;
         case 'admin': html = appShell(adminPage); break;
         default: html = loginPage();
@@ -70,22 +72,22 @@ function appShell(contentFn) {
         </div>
         ${S.page === 'search' ? `
         <div class="search-bar" style="flex-wrap:wrap; gap:8px;">
-            <input class="search-input" id="searchInput" placeholder="Search..." value="${S.searchQuery || ''}">
+            <input class="search-input" id="searchInput" placeholder="Search..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}">
             <select id="searchTypeSel" class="form-select" style="width:110px; padding:12px; border-radius:12px; background:var(--bg-deep); color:white; border:1px solid var(--border);">
                 <option value="movie" ${S.searchType==='movie'?'selected':''}>Title</option>
                 <option value="actor" ${S.searchType==='actor'?'selected':''}>Actor</option>
                 <option value="director" ${S.searchType==='director'?'selected':''}>Director</option>
             </select>
-            <input type="number" id="filterYear" class="search-input" placeholder="Min Year" style="max-width:100px; padding:12px;" value="${S.filterYear || ''}">
             <button class="search-btn" id="searchBtn">🔍 Go</button>
         </div>` : `
         <div class="search-bar">
-            <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${S.searchQuery || ''}">
+            <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}">
             <button class="search-btn" id="searchBtn">🔍 Go</button>
         </div>`}
         <div id="content">${contentFn()}</div>
         <div class="bottom-nav">
             <button class="nav-btn ${S.page === 'home' ? 'active' : ''}" onclick="navigate('home')"><span class="nav-icon">🏠</span>Home</button>
+            <button class="nav-btn ${S.page === 'recently' ? 'active' : ''}" onclick="navigate('recently')"><span class="nav-icon">🕐</span>Recent</button>
             <button class="nav-btn ${S.page === 'watchlist' ? 'active' : ''}" onclick="navigate('watchlist')"><span class="nav-icon">❤️</span>Saved</button>
             <button class="nav-btn ${S.page === 'liked' ? 'active' : ''}" onclick="navigate('liked')"><span class="nav-icon">👍</span>Liked</button>
             <button class="nav-btn ${S.page === 'insights' ? 'active' : ''}" onclick="navigate('insights')"><span class="nav-icon">🧠</span>ML</button>
@@ -140,17 +142,17 @@ function splashPage() {
 
 // ===== HOME PAGE =====
 function homePage() {
-    return `<div class="genre-scroll-container" id="genreContainer"></div>
+    return `<div id="genreContainer"></div>
     <div class="section-title">🏆 Top Rated</div><div id="movieGrid" class="movie-grid">${loadingCards(12)}</div>`;
 }
 
 // ===== SEARCH PAGE =====
 function searchPage() {
     let subtitle = S.searchQuery ? `"${S.searchQuery}"` : '';
-    if (S.filterGenre) subtitle += ` (Genre: ${S.filterGenre})`;
+    if (S.filterGenre) subtitle = `Genre: ${S.filterGenre}`;
     return `<div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
-        <div>🔍 Results for ${subtitle || 'All Movies'}</div>
-        <button class="nav-btn" style="background:var(--card-bg); padding:8px 16px; border-radius:12px; color:white; border:1px solid var(--border)" onclick="navigate('home')">⬅ Back</button>
+        <div>🔍 ${subtitle || 'All Movies'}</div>
+        <button class="nav-btn" style="background:var(--bg-mid); padding:8px 16px; border-radius:12px; color:white; border:1px solid var(--border)" onclick="navigate('home')">⬅ Back</button>
     </div><div id="movieGrid" class="movie-grid">${loadingCards(9)}</div>`;
 }
 
@@ -162,6 +164,11 @@ function watchlistPage() {
 // ===== LIKED PAGE =====
 function likedPage() {
     return `<div class="section-title">👍 Liked Movies</div><div id="movieGrid" class="movie-grid">${loadingCards(6)}</div>`;
+}
+
+// ===== RECENTLY VIEWED PAGE =====
+function recentPage() {
+    return `<div class="section-title">🕐 Recently Viewed</div><div id="movieGrid" class="movie-grid">${loadingCards(6)}</div>`;
 }
 
 // ===== DETAIL PAGE =====
@@ -191,9 +198,19 @@ function detailPage() {
         castHtml = `<div class="detail-section"><div class="detail-section-title">🎭 Top Cast</div></div><div class="cast-scroll">${castList.map(c => `<div class="cast-circle" onclick="navigate('search',{searchQuery:'${c.name.replace(/'/g,"\\'")}',searchType:'actor'})"><img src="${c.photo}" alt="${c.name}" loading="lazy"><div class="cast-name">${c.name.split(' ')[0]}</div></div>`).join('')}</div>`;
     }
 
+    // Trailer: thumbnail first, click to play
     let trailerHtml = '';
     if (m.trailer) {
-        trailerHtml = `<div class="detail-section"><div class="detail-section-title">🎬 Trailer</div></div><div class="trailer-frame"><iframe src="https://www.youtube-nocookie.com/embed/${m.trailer}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+        if (S.trailerPlaying) {
+            trailerHtml = `<div class="detail-section"><div class="detail-section-title">🎬 Trailer</div></div><div class="trailer-frame"><iframe src="https://www.youtube-nocookie.com/embed/${m.trailer}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+        } else {
+            trailerHtml = `<div class="detail-section"><div class="detail-section-title">🎬 Trailer</div></div>
+            <div class="trailer-thumb" onclick="playTrailer()">
+                <img src="https://img.youtube.com/vi/${m.trailer}/hqdefault.jpg" alt="Trailer" onerror="this.src='https://img.youtube.com/vi/${m.trailer}/default.jpg'">
+                <div class="trailer-play-btn"><div class="trailer-play-icon"></div></div>
+            </div>
+            <div style="padding:8px 20px"><button class="btn btn-secondary btn-sm" onclick="playTrailer()">▶ Play Trailer</button></div>`;
+        }
     } else {
         trailerHtml = `<div style="padding:0 20px"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(m.title)}+trailer" target="_blank" class="btn btn-secondary" style="margin-bottom:16px">🔎 Search Trailer on YouTube</a></div>`;
     }
@@ -203,8 +220,14 @@ function detailPage() {
         providersHtml = `<div class="detail-section"><div class="detail-section-title">📺 Where to Watch</div></div><div class="provider-row">${m.providers.map(p => `<img src="${p.logo}" title="${p.name}" class="provider-logo" loading="lazy">`).join('')}</div>`;
     }
 
+    const escTitle = m.title.replace(/'/g, "\\'");
     const shareUrl = encodeURIComponent(window.location.origin + `?movie=${m.id}`);
     const shareText = encodeURIComponent(`Check out ${m.title} on CineMatch!`);
+
+    // Director clickable
+    const dirHtml = m.director && m.director !== 'Unknown'
+        ? `<span class="info-value clickable" onclick="navigate('search',{searchQuery:'${m.director.replace(/'/g,"\\'")}',searchType:'director'})">${m.director}</span>`
+        : `<span class="info-value">${m.director || 'Unknown'}</span>`;
 
     return `<div class="detail-page">
         <div class="detail-back"><button class="btn btn-secondary btn-sm" onclick="goBack()">← Back</button></div>
@@ -226,8 +249,8 @@ function detailPage() {
         ${aiHtml}
         <div class="detail-section"><div class="detail-section-title">📖 Overview</div><p class="overview-text">${m.overview}</p></div>
         <div class="action-row">
-            <button class="action-btn" id="watchlistBtn" onclick="addWatchlist('${m.title.replace(/'/g,"\\'")}')">❤️ Watchlist</button>
-            <button class="action-btn" id="likeBtn" onclick="addLike('${m.title.replace(/'/g,"\\'")}')">👍 Like</button>
+            <button class="action-btn" id="watchlistBtn" onclick="addWatchlist('${escTitle}')">❤️ Watchlist</button>
+            <button class="action-btn" id="likeBtn" onclick="addLike('${escTitle}')">👍 Like</button>
         </div>
         <div class="detail-section"><div class="detail-section-title">📤 Share</div></div>
         <div class="share-row">
@@ -238,7 +261,7 @@ function detailPage() {
         ${castHtml}
         ${trailerHtml}
         <div class="info-box">
-            <div class="info-row"><span class="info-label">Director</span><span class="info-value">${m.director}</span></div>
+            <div class="info-row"><span class="info-label">Director</span>${dirHtml}</div>
             <div class="info-row"><span class="info-label">Budget</span><span class="info-value">${budgetStr}</span></div>
             <div class="info-row"><span class="info-label">Revenue</span><span class="info-value">${revStr}</span></div>
             <div class="info-row"><span class="info-label">Genres</span><span class="info-value">${(m.genres_list || []).join(', ') || m.genres}</span></div>
@@ -248,7 +271,7 @@ function detailPage() {
         <div style="padding:0 20px 16px">
             <div class="form-group"><label class="form-label">Your Rating: <span id="ratingVal">8</span>/10</label><input type="range" min="1" max="10" value="8" id="reviewRating" style="width:100%;accent-color:var(--accent)" oninput="document.getElementById('ratingVal').textContent=this.value"></div>
             <div class="form-group"><textarea class="form-textarea" id="reviewText" placeholder="Share your thoughts about this movie..."></textarea></div>
-            <button class="btn btn-primary btn-sm" id="submitReviewBtn" onclick="submitReview('${m.title.replace(/'/g,"\\'")}')">Submit Review</button>
+            <button class="btn btn-primary btn-sm" id="submitReviewBtn" onclick="submitReview('${escTitle}')">Submit Review</button>
         </div>
         <div class="detail-section"><div class="detail-section-title">📰 User Reviews</div></div>
         <div id="reviewsList"><div class="loading-container"><div class="spinner"></div></div></div>
@@ -266,6 +289,10 @@ function insightsPage() {
         <div id="directorsChart"><div class="loading-container"><div class="spinner"></div></div></div>
         <div class="section-title">🎯 Movie Success Factors</div>
         <div id="factorsChart"><div class="loading-container"><div class="spinner"></div></div></div>
+        <div class="section-title">📊 Genre Popularity Over Decades</div>
+        <div id="genreDecadesChart"><div class="loading-container"><div class="spinner"></div></div></div>
+        <div class="section-title">👤 Your Taste Profile</div>
+        <div id="tasteProfile"><div class="loading-container"><div class="spinner"></div></div></div>
         <div class="section-title">💬 Review Sentiment</div>
         <div id="sentimentChart"><div class="loading-container"><div class="spinner"></div></div></div>
         <div class="section-title">🔬 Live Sentiment Analyzer</div>
@@ -295,7 +322,7 @@ function adminPage() {
 // ===== COMPONENTS =====
 function movieCardHtml(m) {
     return `<div class="movie-card" onclick="openMovie(${m.id})" style="animation-delay:${Math.random()*0.15}s">
-        <img src="${m.poster || `https://placehold.co/500x750/1a1a2e/a5b4fc?text=${encodeURIComponent(m.title?.substring(0,15))}`}" alt="${m.title}" loading="lazy" onerror="this.src='https://placehold.co/500x750/1a1a2e/a5b4fc?text=Movie'">
+        <img src="${m.poster || `https://placehold.co/500x750/1a1a2e/a5b4fc?text=${encodeURIComponent((m.title||'Movie').substring(0,15))}`}" alt="${m.title}" loading="lazy" onerror="this.src='https://placehold.co/500x750/1a1a2e/a5b4fc?text=Movie'">
         <div class="card-info"><div class="card-title">${m.title}</div><div class="card-meta"><span class="card-rating">⭐ ${m.rating}</span><span>${m.year}</span></div></div>
     </div>`;
 }
@@ -327,6 +354,7 @@ function bindEvents() {
     if (S.page === 'detail') loadDetail();
     if (S.page === 'watchlist') loadWatchlist();
     if (S.page === 'liked') loadLiked();
+    if (S.page === 'recently') loadRecent();
     if (S.page === 'insights') loadInsights();
     if (S.page === 'admin') loadAdmin();
 }
@@ -394,43 +422,79 @@ function logout() {
 // ===== SEARCH & FILTERS =====
 function handleSearch() {
     const q = document.getElementById('searchInput')?.value?.trim() || '';
-    const t = document.getElementById('searchTypeSel')?.value || 'movie';
-    if (!q && !S.filterGenre && !S.filterYear && !S.filterRating) return;
+    const t = document.getElementById('searchTypeSel')?.value || S.searchType || 'movie';
+    if (!q && !S.filterGenre) return toast('Enter a search query', 'error');
+    S.filterGenre = ''; // Clear genre filter when doing text search
     navigate('search', { searchQuery: q, searchType: t });
-}
-
-function applyFilters() {
-    S.searchType = document.getElementById('searchTypeSel')?.value || 'movie';
-    S.filterYear = document.getElementById('filterYear')?.value || 0;
-    S.filterRating = document.getElementById('filterRating')?.value || 0;
-    navigate('search');
 }
 
 function filterByGenre(g) {
     S.filterGenre = g;
-    S.searchQuery = ''; // Clear text query when clicking genre
+    S.searchQuery = '';
     navigate('search');
+}
+
+// ===== TRAILER =====
+function playTrailer() {
+    S.trailerPlaying = true;
+    const content = document.getElementById('content');
+    if (content) content.innerHTML = detailPage();
+    // Reload reviews and recs
+    if (S.detailData) {
+        loadReviews(S.detailData.title);
+        loadRecommendations(S.detailData.id);
+    }
 }
 
 // ===== MOVIE ACTIONS =====
 async function openMovie(id) {
-    S.detailData = null; S.detailId = id;
+    S.detailData = null; S.detailId = id; S.trailerPlaying = false;
     navigate('detail');
 }
 
 function goBack() {
-    if (S.page === 'detail') navigate('home');
-    else navigate('home');
+    navigate('home');
 }
 
 async function addWatchlist(title) {
     const res = await api('watchlist', { method: 'POST', body: { username: S.user, movie: title } });
     toast(res.message || (res.success ? '❤️ Added to Watchlist!' : 'Already saved'));
+    if (res.success) triggerBurst('❤️,💖,💕,💗,❤️');
 }
 
 async function addLike(title) {
     const res = await api('liked', { method: 'POST', body: { username: S.user, movie: title } });
     toast(res.message || '👍 Liked!');
+    triggerBurst('👍,⭐,✨,🎉,👍,⭐');
+}
+
+// Floating emoji burst animation
+function triggerBurst(emojisStr) {
+    const emojis = emojisStr.split(',');
+    const container = document.createElement('div');
+    container.className = 'burst-container';
+    emojis.forEach((e, i) => {
+        const el = document.createElement('div');
+        el.className = 'float-emoji';
+        el.textContent = e;
+        el.style.left = (15 + Math.random() * 70) + '%';
+        el.style.bottom = '30%';
+        el.style.animationDelay = (i * 0.08) + 's';
+        container.appendChild(el);
+    });
+    // Add confetti
+    const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181', '#aa96da', '#fcbad3'];
+    for (let i = 0; i < 10; i++) {
+        const c = document.createElement('div');
+        c.className = 'confetti-piece';
+        c.style.left = (10 + Math.random() * 80) + '%';
+        c.style.top = (30 + Math.random() * 20) + '%';
+        c.style.background = colors[i % colors.length];
+        c.style.animationDelay = (Math.random() * 0.3) + 's';
+        container.appendChild(c);
+    }
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 2000);
 }
 
 async function submitReview(title) {
@@ -447,6 +511,9 @@ async function submitReview(title) {
 
 // ===== DATA LOADERS =====
 async function loadHome() {
+    // Load genres for chips
+    loadGenreChips();
+    // Load top movies
     const grid = document.getElementById('movieGrid');
     try {
         const movies = await api('movies/top');
@@ -454,22 +521,48 @@ async function loadHome() {
     } catch { grid.innerHTML = emptyState('⚠️', 'Failed to load movies'); }
 }
 
+async function loadGenreChips() {
+    const container = document.getElementById('genreContainer');
+    if (!container) return;
+    try {
+        const genres = await api('genres');
+        if (genres && genres.length) {
+            S.genreList = genres;
+            container.innerHTML = `<div class="genre-scroll">${genres.map(g =>
+                `<div class="genre-chip" onclick="filterByGenre('${g}')">${g}</div>`
+            ).join('')}</div>`;
+        }
+    } catch {}
+}
+
 async function loadSearch() {
     const grid = document.getElementById('movieGrid');
     try {
-        const movies = await api(`movies/search?q=${encodeURIComponent(S.searchQuery)}&type=${S.searchType}`);
-        grid.innerHTML = movies.length ? movies.map(movieCardHtml).join('') : emptyState('🔍', 'No results found');
-    } catch { grid.innerHTML = emptyState('⚠️', 'Search failed'); }
+        let movies;
+        if (S.filterGenre) {
+            // Genre filter mode — use the filter API
+            movies = await api(`movies/filter?genre=${encodeURIComponent(S.filterGenre)}`);
+        } else if (S.searchQuery) {
+            // Text search mode — use search API
+            movies = await api(`movies/search?q=${encodeURIComponent(S.searchQuery)}&type=${S.searchType}`);
+        } else {
+            movies = [];
+        }
+        grid.innerHTML = movies.length ? movies.map(movieCardHtml).join('') : emptyState('🔍', 'No results found. Try a different search.');
+    } catch (err) {
+        console.error('Search error:', err);
+        grid.innerHTML = emptyState('⚠️', 'Search failed. Please try again.');
+    }
 }
 
 async function loadDetail() {
     try {
         const m = await api(`movies/${S.detailId}`);
         S.detailData = m;
-        // Add to recently viewed
+        // Add to recently viewed with poster data
         S.recentlyViewed = S.recentlyViewed.filter(r => r.id !== m.id);
-        S.recentlyViewed.unshift({ id: m.id, title: m.title });
-        S.recentlyViewed = S.recentlyViewed.slice(0, 10);
+        S.recentlyViewed.unshift({ id: m.id, title: m.title, poster: m.poster, rating: m.rating, year: m.year });
+        S.recentlyViewed = S.recentlyViewed.slice(0, 15);
         localStorage.setItem('cm_recent', JSON.stringify(S.recentlyViewed));
         // Re-render with data
         document.getElementById('content').innerHTML = detailPage();
@@ -518,6 +611,21 @@ async function loadLiked() {
     } catch { grid.innerHTML = emptyState('⚠️', 'Failed to load'); }
 }
 
+async function loadRecent() {
+    const grid = document.getElementById('movieGrid');
+    if (!S.recentlyViewed.length) {
+        grid.innerHTML = emptyState('🕐', 'No recently viewed movies. Browse and click on movies to see them here!');
+        return;
+    }
+    // Show from localStorage (has poster data)
+    const cards = S.recentlyViewed.map(r => ({
+        id: r.id, title: r.title,
+        poster: r.poster || `https://placehold.co/500x750/1a1a2e/a5b4fc?text=${encodeURIComponent((r.title||'Movie').substring(0,15))}`,
+        rating: r.rating || 0, year: r.year || 'N/A'
+    }));
+    grid.innerHTML = cards.map(movieCardHtml).join('');
+}
+
 // ===== ML INSIGHTS LOADERS =====
 async function loadInsights() {
     // Model stats
@@ -547,6 +655,53 @@ async function loadInsights() {
             const max = Math.max(...entries.map(e => e[1]));
             container.innerHTML = `<div class="bar-chart">${entries.map(([k, v]) => `<div class="bar-row"><div class="bar-label">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(0)}%;background:linear-gradient(90deg,#f093fb,#764ba2)"><span class="bar-value">${v}%</span></div></div></div>`).join('')}</div>`;
         } else container.innerHTML = emptyState('🎯', 'Train models to see factors');
+    } catch {}
+    // Genre Decades
+    try {
+        const gd = await api('ml/genre-decades');
+        const container = document.getElementById('genreDecadesChart');
+        if (gd && gd.length) {
+            // Group by decade
+            const decades = {};
+            gd.forEach(item => {
+                if (!decades[item.decade]) decades[item.decade] = {};
+                decades[item.decade][item.genre] = item.count;
+            });
+            const allGenres = [...new Set(gd.map(i => i.genre))];
+            const genreColors = ['#667eea','#f093fb','#34d399','#fbbf24','#f87171','#00d4ff','#a78bfa','#ff6b6b'];
+            // Legend
+            let legendHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 12px">${allGenres.map((g,i) => `<span style="font-size:0.7rem;color:${genreColors[i%genreColors.length]};font-weight:600">● ${g}</span>`).join('')}</div>`;
+            // Bars per decade
+            let barsHtml = '<div class="bar-chart">';
+            Object.keys(decades).sort().forEach(decade => {
+                const maxInDecade = Math.max(...Object.values(decades[decade]));
+                allGenres.forEach((genre, gi) => {
+                    const count = decades[decade][genre] || 0;
+                    if (count > 0) {
+                        barsHtml += `<div class="bar-row"><div class="bar-label" style="width:80px">${decade} ${genre.substring(0,6)}</div><div class="bar-track"><div class="bar-fill" style="width:${(count/maxInDecade*100).toFixed(0)}%;background:${genreColors[gi%genreColors.length]}"><span class="bar-value">${count}</span></div></div></div>`;
+                    }
+                });
+            });
+            barsHtml += '</div>';
+            container.innerHTML = legendHtml + barsHtml;
+        } else container.innerHTML = emptyState('📊', 'Not enough data');
+    } catch {}
+    // Taste Profile
+    try {
+        const tp = await api(`ml/taste-profile?username=${S.user}`);
+        const container = document.getElementById('tasteProfile');
+        const entries = Object.entries(tp);
+        if (entries.length) {
+            const max = Math.max(...entries.map(e => e[1]));
+            const colors = ['#667eea','#f093fb','#34d399','#fbbf24','#f87171','#00d4ff','#a78bfa','#ff6b6b'];
+            container.innerHTML = `<div class="taste-grid">${entries.map(([genre, count], i) => `
+                <div class="taste-item">
+                    <div class="taste-genre">${genre}</div>
+                    <div class="taste-bar-bg"><div class="taste-bar-fill" style="width:${(count/max*100).toFixed(0)}%;background:${colors[i%colors.length]}"></div></div>
+                    <div class="taste-count">${count} movies</div>
+                </div>
+            `).join('')}</div>`;
+        } else container.innerHTML = emptyState('👤', 'Add movies to watchlist or likes to see your taste profile!');
     } catch {}
     // Sentiment Distribution
     try {
