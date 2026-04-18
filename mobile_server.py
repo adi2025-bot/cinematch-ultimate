@@ -334,6 +334,23 @@ def api_rec(mid):
     except:
         return jsonify([])
 
+@app.route('/api/movies/suggestions')
+def api_suggestions():
+    """Lightweight autocomplete: returns up to 8 title matches."""
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    try:
+        matches = movies_df[movies_df['title'].fillna('').str.contains(q, case=False, regex=False)]
+        titles = matches['title'].head(8).tolist()
+        # Return id + title for each suggestion
+        results = []
+        for _, row in matches.head(8).iterrows():
+            results.append({'id': int(row['movie_id']), 'title': str(row['title'])})
+        return jsonify(results)
+    except:
+        return jsonify([])
+
 @app.route('/api/movies/search')
 def api_search():
     q = request.args.get('q', '').strip()

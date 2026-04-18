@@ -12,6 +12,7 @@ const S = {
     recentlyViewed: JSON.parse(localStorage.getItem('cm_recent') || '[]'),
     genreList: [],
     trailerPlaying: false,
+    suggestTimer: null,
 };
 
 // ===== API HELPER =====
@@ -72,7 +73,10 @@ function appShell(contentFn) {
         </div>
         ${S.page === 'search' ? `
         <div class="search-bar" style="flex-wrap:wrap; gap:8px;">
-            <input class="search-input" id="searchInput" placeholder="Search..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}">
+            <div class="search-input-wrapper">
+                <input class="search-input" id="searchInput" placeholder="Search..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off">
+                <div class="search-suggestions" id="searchSuggestions"></div>
+            </div>
             <select id="searchTypeSel" class="form-select" style="width:110px; padding:12px; border-radius:12px; background:var(--bg-deep); color:white; border:1px solid var(--border);">
                 <option value="movie" ${S.searchType==='movie'?'selected':''}>Title</option>
                 <option value="actor" ${S.searchType==='actor'?'selected':''}>Actor</option>
@@ -81,7 +85,10 @@ function appShell(contentFn) {
             <button class="search-btn" id="searchBtn">🔍 Go</button>
         </div>` : `
         <div class="search-bar">
-            <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}">
+            <div class="search-input-wrapper">
+                <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off">
+                <div class="search-suggestions" id="searchSuggestions"></div>
+            </div>
             <button class="search-btn" id="searchBtn">🔍 Go</button>
         </div>`}
         <div id="content">${contentFn()}</div>
@@ -345,8 +352,13 @@ function bindEvents() {
     document.getElementById('forgotResetBtn')?.addEventListener('click', handleForgotReset);
 
     // Search
-    document.getElementById('searchBtn')?.addEventListener('click', handleSearch);
-    document.getElementById('searchInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') handleSearch(); });
+    document.getElementById('searchBtn')?.addEventListener('click', () => { hideSuggestions(); handleSearch(); });
+    document.getElementById('searchInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') { hideSuggestions(); handleSearch(); } });
+    document.getElementById('searchInput')?.addEventListener('input', handleSearchInput);
+    // Dismiss suggestions on outside tap
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.search-input-wrapper')) hideSuggestions();
+    }, { once: true });
 
     // Load data based on page
     if (S.page === 'home') loadHome();
@@ -432,6 +444,49 @@ function filterByGenre(g) {
     S.filterGenre = g;
     S.searchQuery = '';
     navigate('search');
+}
+
+// ===== SEARCH SUGGESTIONS =====
+function handleSearchInput(e) {
+    const q = e.target.value.trim();
+    clearTimeout(S.suggestTimer);
+    if (q.length < 2) { hideSuggestions(); return; }
+    S.suggestTimer = setTimeout(() => fetchSuggestions(q), 250);
+}
+
+async function fetchSuggestions(q) {
+    try {
+        const results = await api(`movies/suggestions?q=${encodeURIComponent(q)}`);
+        showSuggestions(results, q);
+    } catch { hideSuggestions(); }
+}
+
+function showSuggestions(results, query) {
+    const container = document.getElementById('searchSuggestions');
+    if (!container || !results.length) { hideSuggestions(); return; }
+    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    container.innerHTML = results.map(r => {
+        const highlighted = r.title.replace(re, '<span class="sg-match">$1</span>');
+        return `<div class="sg-item" data-id="${r.id}" data-title="${r.title.replace(/"/g,'&quot;')}">
+            <span class="sg-icon">🎬</span>
+            <span class="sg-text">${highlighted}</span>
+            <span class="sg-arrow">↗</span>
+        </div>`;
+    }).join('');
+    container.classList.add('active');
+    // Bind click on each suggestion
+    container.querySelectorAll('.sg-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const id = parseInt(item.dataset.id);
+            hideSuggestions();
+            openMovie(id);
+        });
+    });
+}
+
+function hideSuggestions() {
+    const container = document.getElementById('searchSuggestions');
+    if (container) { container.classList.remove('active'); container.innerHTML = ''; }
 }
 
 // ===== TRAILER =====
