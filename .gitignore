@@ -8,7 +8,8 @@ env/
 
 # Large Machine Learning Models
 similarity.pkl
-# (Note: we leave similarity.pkl.gz unmarked so it gets deployed since it's under 100MB)
+similarity.pkl.gz
+movie_list.pkl
 
 # Logs and databases
 *.sqlite3
