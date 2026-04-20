@@ -473,12 +473,98 @@ function handleSearch() {
 
 function filterByGenre(g) {
     if (g === 'Adult' || g === '🔞 Adult') {
-        if (!confirm("Are you 18 or above?")) return;
-        g = 'Adult';
+        showAgeVerificationModal();
+        return;
     }
+    executeGenreFilter(g);
+}
+
+function executeGenreFilter(g) {
     S.filterGenre = g;
     S.searchQuery = '';
     navigate('search');
+}
+
+function showAgeVerificationModal() {
+    if (document.getElementById('ageVerifyOverlay')) return;
+    
+    const curYear = new Date().getFullYear();
+    let yearOpts = '<option value="" disabled selected>Year</option>';
+    for(let y=curYear; y>=1920; y--) yearOpts += `<option value="${y}">${y}</option>`;
+    
+    let monthOpts = '<option value="" disabled selected>Month</option>';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    months.forEach((m, i) => monthOpts += `<option value="${i}">${m}</option>`);
+    
+    let dayOpts = '<option value="" disabled selected>Day</option>';
+    for(let d=1; d<=31; d++) dayOpts += `<option value="${d}">${d}</option>`;
+
+    const html = `
+    <div id="ageVerifyOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(5px); z-index:9999; display:flex; justify-content:center; align-items:center; opacity:0; transition:opacity 0.3s ease;">
+        <div style="background:#ffffff; width:90%; max-width:420px; aspect-ratio: 1 / 1; border-radius:50%; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow:20px 20px 60px rgba(0,0,0,0.5), inset -10px -10px 20px rgba(0,0,0,0.05); text-align:center; transform:scale(0.8) translateY(20px); transition:all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); color:#333; position:relative; padding:20px;">
+            
+            <div style="font-size:4.5rem; font-weight:bold; color:#e74c3c; line-height:1; margin-bottom:10px; text-shadow:2px 4px 10px rgba(231,76,60,0.3);">?</div>
+            
+            <h2 style="margin:0 0 5px; font-size:1.6rem; color:#2c3e50; font-weight:700;">Are you over 18 years old?</h2>
+            <p style="margin:0 0 15px; color:#7f8c8d; font-size:0.9rem;">Please enter your date of birth</p>
+            
+            <div style="display:flex; gap:8px; justify-content:center; margin-bottom:15px; width:80%;">
+                <select id="avDay" style="padding:8px; border-radius:6px; border:1px solid #ddd; background:#f9f9f9; flex:1; outline:none;">${dayOpts}</select>
+                <select id="avMonth" style="padding:8px; border-radius:6px; border:1px solid #ddd; background:#f9f9f9; flex:1.5; outline:none;">${monthOpts}</select>
+                <select id="avYear" style="padding:8px; border-radius:6px; border:1px solid #ddd; background:#f9f9f9; flex:1.2; outline:none;">${yearOpts}</select>
+            </div>
+            
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#555; margin-bottom:20px; cursor:pointer;">
+                <input type="checkbox" id="avTerms" style="width:16px; height:16px; accent-color:#3498db;">
+                I agree with <span style="color:#3498db;">Terms & Condition</span>
+            </label>
+            
+            <div style="display:flex; gap:15px; width:70%; justify-content:center;">
+                <button onclick="verifyAgeSubmit()" style="background:#8cc152; color:white; border:none; padding:10px 0; width:50%; border-radius:25px; font-weight:600; font-size:1rem; cursor:pointer; box-shadow:0 4px 10px rgba(140,193,82,0.4); transition:transform 0.2s;">Confirm</button>
+                <button onclick="document.getElementById('ageVerifyOverlay').style.opacity='0'; setTimeout(()=>document.getElementById('ageVerifyOverlay').remove(), 300);" style="background:#95a5a6; color:white; border:none; padding:10px 0; width:50%; border-radius:25px; font-weight:600; font-size:1rem; cursor:pointer; box-shadow:0 4px 10px rgba(149,165,166,0.4); transition:transform 0.2s;">Exit</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    setTimeout(() => {
+        const overlay = document.getElementById('ageVerifyOverlay');
+        if (overlay) {
+            overlay.style.opacity = '1';
+            overlay.children[0].style.transform = 'scale(1) translateY(0)';
+        }
+    }, 20);
+}
+
+window.verifyAgeSubmit = function() {
+    const d = document.getElementById('avDay').value;
+    const m = document.getElementById('avMonth').value;
+    const y = document.getElementById('avYear').value;
+    const terms = document.getElementById('avTerms').checked;
+    
+    if (!d || !m || !y) return toast('Please select your complete date of birth.', 'error');
+    if (!terms) return toast('You must agree to the Terms & Conditions.', 'error');
+    
+    const dob = new Date(y, m, d);
+    let age = new Date().getFullYear() - dob.getFullYear();
+    const mDiff = new Date().getMonth() - dob.getMonth();
+    if (mDiff < 0 || (mDiff === 0 && new Date().getDate() < dob.getDate())) {
+        age--;
+    }
+    
+    if (age >= 18) {
+        document.getElementById('ageVerifyOverlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('ageVerifyOverlay').remove();
+            executeGenreFilter('Adult');
+            if (typeof window.hideAdultSuggestions === 'function') {
+                window.hideAdultSuggestions(); // clean up if triggered from search
+            }
+        }, 300);
+    } else {
+        toast('Sorry, you must be 18 or older to view this content.', 'error');
+    }
 }
 
 // ===== SEARCH SUGGESTIONS =====
