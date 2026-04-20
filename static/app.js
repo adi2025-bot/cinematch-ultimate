@@ -753,9 +753,11 @@ async function loadGenreChips() {
         const genres = await api('genres');
         if (genres && genres.length) {
             S.genreList = genres;
-            container.innerHTML = `<div class="genre-scroll">${genres.map(g =>
-                `<div class="genre-chip" onclick="filterByGenre('${g}')">${g}</div>`
-            ).join('')}</div>`;
+            const colors = ['#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#f1c40f', '#00cec9', '#e84393', '#fdcb6e'];
+            container.innerHTML = `<div class="genre-scroll" style="display:flex; gap:12px; padding:10px 20px; overflow-x:auto;">${genres.map((g, i) => {
+                const c = colors[i % colors.length];
+                return `<div class="genre-chip" style="border: 2px solid ${c}; background: transparent; color: white; padding: 6px 20px; border-radius: 25px; box-shadow: 0 0 12px ${c}40, inset 0 0 8px ${c}20; font-weight: 600; letter-spacing: 0.5px; flex-shrink: 0; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onclick="filterByGenre('${g}')" onmouseover="this.style.boxShadow='0 0 20px ${c}80, inset 0 0 12px ${c}40'; this.style.transform='scale(1.05)';" onmouseout="this.style.boxShadow='0 0 12px ${c}40, inset 0 0 8px ${c}20'; this.style.transform='scale(1)';">${g}</div>`
+            }).join('')}</div>`;
         }
     } catch {}
 }
