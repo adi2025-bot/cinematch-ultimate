@@ -15,8 +15,28 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-    // Network first, fallback to cache
     if (e.request.method !== 'GET') return;
+    
+    const url = new URL(e.request.url);
+    
+    // API Caching: Stale-While-Revalidate (great for offline functionality)
+    if (url.pathname.includes('/api/')) {
+        e.respondWith(
+            caches.open(CACHE_NAME).then(cache => {
+                return cache.match(e.request).then(cachedResponse => {
+                    const fetchedResponse = fetch(e.request).then(networkResponse => {
+                        cache.put(e.request, networkResponse.clone());
+                        return networkResponse;
+                    }).catch(() => {});
+                    
+                    return cachedResponse || fetchedResponse;
+                });
+            })
+        );
+        return;
+    }
+
+    // Static Assets & Others: Network First, fallback to cache
     e.respondWith(
         fetch(e.request).then(res => {
             const clone = res.clone();
