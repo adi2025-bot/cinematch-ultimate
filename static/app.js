@@ -457,6 +457,9 @@ function switchTab(name) {
 }
 
 function logout() {
+    if (S.user) {
+        localStorage.removeItem(`cm_adult_verified_${S.user}`);
+    }
     S.user = null; S.role = null;
     localStorage.removeItem('cm_user');
     navigate('login');
@@ -473,6 +476,10 @@ function handleSearch() {
 
 function filterByGenre(g) {
     if (g === 'Adult' || g === '🔞 Adult') {
+        if (localStorage.getItem(`cm_adult_verified_${S.user}`) === 'true') {
+            executeGenreFilter('Adult');
+            return;
+        }
         showAgeVerificationModal();
         return;
     }
@@ -554,6 +561,7 @@ window.verifyAgeSubmit = function() {
     }
     
     if (age >= 18) {
+        localStorage.setItem(`cm_adult_verified_${S.user}`, 'true');
         document.getElementById('ageVerifyOverlay').style.opacity = '0';
         setTimeout(() => {
             document.getElementById('ageVerifyOverlay').remove();
