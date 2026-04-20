@@ -353,7 +353,10 @@ function adminPage() {
 
 // ===== COMPONENTS =====
 function movieCardHtml(m) {
-    return `<div class="movie-card" onclick="openMovie(${m.id})" style="animation-delay:${Math.random()*0.15}s">
+    const borders = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+    const bColor = borders[(m.id || 0) % borders.length];
+    
+    return `<div class="movie-card" onclick="openMovie(${m.id})" style="animation-delay:${Math.random()*0.15}s; border: 2px solid ${bColor}80; box-shadow: 0 4px 15px ${bColor}20;">
         <img src="${m.poster || `https://placehold.co/500x750/1a1a2e/a5b4fc?text=${encodeURIComponent((m.title||'Movie').substring(0,15))}`}" alt="${m.title}" loading="lazy" onerror="this.src='https://placehold.co/500x750/1a1a2e/a5b4fc?text=Movie'">
         <div class="card-info"><div class="card-title">${m.title}</div><div class="card-meta"><span class="card-rating">⭐ ${m.rating}</span><span>${m.year}</span></div></div>
     </div>`;
