@@ -35,32 +35,7 @@ function toast(msg, type = 'success') {
 }
 
 // ===== NAVIGATE =====
-function resetTheme() {
-    document.body.style.backgroundImage = 'none';
-}
-
-function applyDynamicTheme(imgUrl) {
-    if (!imgUrl) return;
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.src = imgUrl;
-    img.onload = () => {
-        try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width; canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            let r=0,g=0,b=0, count=0;
-            for (let i=0; i<data.length; i+=400) { r += data[i]; g += data[i+1]; b += data[i+2]; count++; }
-            r = Math.floor((r/count) * 0.35); g = Math.floor((g/count) * 0.35); b = Math.floor((b/count) * 0.35);
-            document.body.style.backgroundImage = `radial-gradient(circle at top, rgb(${r},${g},${b}) 0%, var(--bg-base) 80%)`;
-        } catch(e) {}
-    }
-}
-
 function navigate(page, params = {}) {
-    resetTheme();
     Object.assign(S, { page, ...params });
     render();
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -834,7 +809,6 @@ async function loadDetail() {
         localStorage.setItem('cm_recent', JSON.stringify(S.recentlyViewed));
         // Re-render with data
         document.getElementById('content').innerHTML = detailPage();
-        applyDynamicTheme(m.poster); // Option 4: Dynamic Theme
         // Load reviews & recommendations
         loadReviews(m.title);
         loadRecommendations(m.id);
