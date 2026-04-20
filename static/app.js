@@ -157,10 +157,28 @@ function homePage() {
 function searchPage() {
     let subtitle = S.searchQuery ? `"${S.searchQuery}"` : '';
     if (S.filterGenre) subtitle = `Genre: ${S.filterGenre}`;
+    
+    let extraSearch = '';
+    if (S.filterGenre === 'Adult') {
+        extraSearch = `
+        <div class="search-bar" style="margin: 0 20px 16px; width: auto; max-width: none;">
+            <div class="search-input-wrapper">
+                <input class="search-input" id="adultSpecificSearch" placeholder="Search adult movies..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off" oninput="handleAdultSearchInput(event)">
+                <div class="search-suggestions" id="adultSearchSuggestions"></div>
+            </div>
+            <button class="search-btn" onclick="S.searchQuery=document.getElementById('adultSpecificSearch').value.trim(); S.searchPage=1; loadSearch(1); hideAdultSuggestions();">🔍 Search</button>
+        </div>`;
+    }
+
     return `<div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
         <div>🔍 ${subtitle || 'All Movies'}</div>
         <button class="nav-btn" style="background:var(--bg-mid); padding:8px 16px; border-radius:12px; color:white; border:1px solid var(--border)" onclick="navigate('home')">⬅ Back</button>
-    </div><div id="movieGrid" class="movie-grid">${loadingCards(9)}</div>`;
+    </div>
+    ${extraSearch}
+    <div id="movieGrid" class="movie-grid">${loadingCards(9)}</div>
+    <div id="loadMoreContainer" style="text-align:center; padding: 0px 20px 80px; display:none; margin-top: -5px;">
+        <button class="btn" style="background-color: #e50914; color: white; border: none; padding: 12px 30px; font-weight: bold; font-size: 1rem; border-radius: 6px; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); text-transform: uppercase; letter-spacing: 1px;" onclick="S.searchPage=(S.searchPage||1)+1; loadSearch(S.searchPage)">Load More Movies</button>
+    </div>`;
 }
 
 // ===== WATCHLIST PAGE =====
@@ -183,8 +201,15 @@ function detailPage() {
     if (!S.detailData) return `<div class="loading-container"><div class="spinner"></div><p style="color:var(--text-muted)">Loading movie details...</p></div>`;
     const m = S.detailData;
     const rt = m.runtime ? `${Math.floor(m.runtime/60)}h ${m.runtime%60}m` : 'N/A';
-    const budgetStr = m.budget > 0 ? `$${(m.budget/1000000).toFixed(1)}M` : 'N/A';
-    const revStr = m.revenue > 0 ? `$${(m.revenue/1000000).toFixed(1)}M` : 'N/A';
+    let budgetStr = 'N/A';
+    if (m.budget > 0) {
+        budgetStr = `$${(m.budget/1000000).toFixed(1)}M / ₹${((m.budget * 83) / 10000000).toFixed(1)}Cr`;
+    }
+    
+    let revStr = 'N/A';
+    if (m.revenue > 0) {
+        revStr = `$${(m.revenue/1000000).toFixed(1)}M / ₹${((m.revenue * 83) / 10000000).toFixed(1)}Cr`;
+    }
     const backdrop = m.backdrop || m.poster;
     let certClass = '';
     const strictCerts = ['A', 'NC-17', 'R', '18+', '18', 'UA 16+'];
@@ -357,8 +382,11 @@ function bindEvents() {
     document.getElementById('searchInput')?.addEventListener('input', handleSearchInput);
     // Dismiss suggestions on outside tap
     document.addEventListener('click', e => {
-        if (!e.target.closest('.search-input-wrapper')) hideSuggestions();
-    }, { once: true });
+        if (!e.target.closest('.search-input-wrapper')) {
+            hideSuggestions();
+            hideAdultSuggestions();
+        }
+    });
 
     // Load data based on page
     if (S.page === 'home') loadHome();
@@ -441,6 +469,10 @@ function handleSearch() {
 }
 
 function filterByGenre(g) {
+    if (g === 'Adult' || g === '🔞 Adult') {
+        if (!confirm("Are you 18 or above?")) return;
+        g = 'Adult';
+    }
     S.filterGenre = g;
     S.searchQuery = '';
     navigate('search');
@@ -486,6 +518,47 @@ function showSuggestions(results, query) {
 
 function hideSuggestions() {
     const container = document.getElementById('searchSuggestions');
+    if (container) { container.classList.remove('active'); container.innerHTML = ''; }
+}
+
+function handleAdultSearchInput(e) {
+    const q = e.target.value.trim();
+    clearTimeout(S.suggestTimer);
+    if (q.length < 2) { hideAdultSuggestions(); return; }
+    S.suggestTimer = setTimeout(() => fetchAdultSuggestions(q), 250);
+}
+
+async function fetchAdultSuggestions(q) {
+    try {
+        const results = await api(`movies/suggestions?q=${encodeURIComponent(q)}&genre=Adult`);
+        showAdultSuggestions(results, q);
+    } catch { hideAdultSuggestions(); }
+}
+
+function showAdultSuggestions(results, query) {
+    const container = document.getElementById('adultSearchSuggestions');
+    if (!container || !results.length) { hideAdultSuggestions(); return; }
+    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'gi');
+    container.innerHTML = results.map(r => {
+        const highlighted = r.title.replace(re, '<span class="sg-match">$1</span>');
+        return `<div class="sg-item" data-id="${r.id}" data-title="${r.title.replace(/"/g,'&quot;')}">
+            <span class="sg-icon">🔞</span>
+            <span class="sg-text">${highlighted}</span>
+            <span class="sg-arrow">↗</span>
+        </div>`;
+    }).join('');
+    container.classList.add('active');
+    container.querySelectorAll('.sg-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const id = parseInt(item.dataset.id);
+            hideAdultSuggestions();
+            openMovie(id);
+        });
+    });
+}
+
+function hideAdultSuggestions() {
+    const container = document.getElementById('adultSearchSuggestions');
     if (container) { container.classList.remove('active'); container.innerHTML = ''; }
 }
 
@@ -590,23 +663,39 @@ async function loadGenreChips() {
     } catch {}
 }
 
-async function loadSearch() {
+async function loadSearch(page = 1) {
+    S.searchPage = page;
     const grid = document.getElementById('movieGrid');
+    const loadMoreBtn = document.getElementById('loadMoreContainer');
+    if (page === 1) {
+        grid.innerHTML = loadingCards(9);
+        if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+    }
     try {
         let movies;
         if (S.filterGenre) {
-            // Genre filter mode — use the filter API
-            movies = await api(`movies/filter?genre=${encodeURIComponent(S.filterGenre)}`);
+            // Genre filter mode — use the filter API with pagination and query
+            movies = await api(`movies/filter?genre=${encodeURIComponent(S.filterGenre)}&q=${encodeURIComponent(S.searchQuery || '')}&page=${page}`);
         } else if (S.searchQuery) {
             // Text search mode — use search API
             movies = await api(`movies/search?q=${encodeURIComponent(S.searchQuery)}&type=${S.searchType}`);
         } else {
             movies = [];
         }
-        grid.innerHTML = movies.length ? movies.map(movieCardHtml).join('') : emptyState('🔍', 'No results found. Try a different search.');
+        
+        const html = movies.length ? movies.map(movieCardHtml).join('') : '';
+        if (page === 1) {
+            grid.innerHTML = html || emptyState('🔍', 'No results found. Try a different search.');
+        } else if (html) {
+            grid.innerHTML += html;
+        }
+        
+        if (loadMoreBtn) {
+            loadMoreBtn.style.display = (S.filterGenre && movies.length === 30) ? 'block' : 'none';
+        }
     } catch (err) {
         console.error('Search error:', err);
-        grid.innerHTML = emptyState('⚠️', 'Search failed. Please try again.');
+        if (page === 1) grid.innerHTML = emptyState('⚠️', 'Search failed. Please try again.');
     }
 }
 

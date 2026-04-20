@@ -241,6 +241,8 @@ def api_top():
     C = movies_df['vote_average'].mean()
     m_val = movies_df['vote_count'].quantile(0.9)
     q = movies_df.loc[movies_df['vote_count'] >= m_val].copy()
+    if 'adult' in q.columns:
+        q = q[q['adult'] == False]
     q['score'] = q.apply(lambda x: (x['vote_count']/(x['vote_count']+m_val)*x['vote_average'])+(m_val/(m_val+x['vote_count'])*C), axis=1)
     top = q.sort_values('score', ascending=False)
     return jsonify(cards_with_posters(top, 20))
@@ -338,10 +340,16 @@ def api_rec(mid):
 def api_suggestions():
     """Lightweight autocomplete: returns up to 8 title matches."""
     q = request.args.get('q', '').strip()
+    g = request.args.get('genre', '')
     if not q or len(q) < 2:
         return jsonify([])
     try:
         matches = movies_df[movies_df['title'].fillna('').str.contains(q, case=False, regex=False)]
+        if 'adult' in matches.columns:
+            if g == 'Adult':
+                matches = matches[matches['adult'] == True]
+            else:
+                matches = matches[matches['adult'] == False]
         titles = matches['title'].head(8).tolist()
         # Return id + title for each suggestion
         results = []
@@ -358,9 +366,14 @@ def api_search():
     if not q:
         return jsonify([])
     try:
+        # Hide adult movies from search globally
+        search_df = movies_df.copy()
+        if 'adult' in search_df.columns:
+            search_df = search_df[search_df['adult'] == False]
+            
         # Use fillna('') to prevent NaN eval errors in pandas
         if t == 'movie':
-            exact = movies_df[movies_df['title'].fillna('').str.lower() == q.lower()]
+            exact = search_df[search_df['title'].fillna('').str.lower() == q.lower()]
             if not exact.empty:
                 # Automatically append recommendations downstream
                 idx = exact.index[0]
@@ -369,22 +382,26 @@ def api_search():
                     title = exact.iloc[0]['title']
                     dists = similarity.get(title, [])
                     if dists: recs = movies_df.iloc[dists[:10]]
+                    if not recs.empty and 'adult' in recs.columns:
+                        recs = recs[recs['adult'] == False]
                 else:
                     dists = sorted(list(enumerate(similarity[idx])), reverse=True, key=lambda x: x[1])[1:11]
                     recs = movies_df.iloc[[i[0] for i in dists]]
+                    if not recs.empty and 'adult' in recs.columns:
+                        recs = recs[recs['adult'] == False]
                 
                 if not recs.empty:
                     combined = pd.concat([exact, recs])
                     return jsonify(cards_with_posters(combined, 11))
                 return jsonify(cards_with_posters(exact, 1))
             
-            partial = movies_df[movies_df['title'].fillna('').str.contains(q, case=False, regex=False)]
+            partial = search_df[search_df['title'].fillna('').str.contains(q, case=False, regex=False)]
             return jsonify(cards_with_posters(partial, 20))
         elif t == 'director':
-            sub = movies_df[movies_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
+            sub = search_df[search_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
             return jsonify(cards_with_posters(sub, 20))
         elif t == 'actor':
-            sub = movies_df[movies_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
+            sub = search_df[search_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
             return jsonify(cards_with_posters(sub, 20))
     except Exception as e:
         print(f"Search API Error: {e}")
@@ -394,15 +411,35 @@ def api_search():
 @app.route('/api/movies/filter')
 def api_filter():
     genre = request.args.get('genre', 'All')
+    q = request.args.get('q', '').strip()
+    page = int(request.args.get('page', 1))
     min_y = int(request.args.get('min_year', 1950))
     max_y = int(request.args.get('max_year', 2026))
     min_r = int(request.args.get('min_rating', 0))
+    limit = 30
+    
     sub = movies_df[(movies_df['year_int'] >= min_y) & (movies_df['year_int'] <= max_y) & (movies_df['vote_average'] * 10 >= min_r)]
-    if genre not in ('All', 'Adult'):
+    if genre not in ('All', 'Adult', 'Bollywood'):
         sub = sub[sub['genres_list'].apply(lambda x: genre in x if isinstance(x, list) else False)]
+        if 'adult' in sub.columns:
+            sub = sub[sub['adult'] == False]
     elif genre == 'Adult':
         sub = sub[sub['adult'] == True] if 'adult' in sub.columns else pd.DataFrame()
-    return jsonify(cards_with_posters(sub, 30))
+    elif genre == 'Bollywood':
+        if 'original_language' in sub.columns:
+            sub = sub[sub['original_language'] == 'hi']
+        if 'adult' in sub.columns:
+            sub = sub[sub['adult'] == False]
+    elif genre == 'All':
+        if 'adult' in sub.columns:
+            sub = sub[sub['adult'] == False]
+            
+    if q:
+        sub = sub[sub['title'].fillna('').str.contains(q, case=False, regex=False)]
+        
+    start = (page - 1) * limit
+    end = start + limit
+    return jsonify(cards_with_posters(sub.iloc[start:end], limit))
 
 @app.route('/api/genres')
 def api_genres():
@@ -410,7 +447,12 @@ def api_genres():
     for gl in movies_df['genres_list']:
         if isinstance(gl, list):
             genres.update(gl)
-    return jsonify(sorted(list(genres)))
+    genre_list = sorted(list(genres))
+    if 'Adult' not in genre_list:
+        genre_list.append('Adult')
+    if 'Bollywood' not in genre_list:
+        genre_list.append('Bollywood')
+    return jsonify(genre_list)
 
 # ==========================================
 # USER ACTIONS API
