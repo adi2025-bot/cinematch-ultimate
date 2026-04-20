@@ -130,8 +130,11 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); min-height: 48px;
     letter-spacing: 0.3px;
 }
-.btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); }
-.btn-primary:active { transform: scale(0.96); }
+.btn-primary { 
+    background: var(--gradient-primary); color: white; 
+    box-shadow: 0 10px 35px -5px rgba(139, 92, 246, 0.6); 
+}
+.btn-primary:active { transform: scale(0.96); box-shadow: 0 5px 15px -5px rgba(139, 92, 246, 0.4); }
 .btn-secondary { background: rgba(139, 92, 246, 0.15); color: var(--text-secondary); border: 1px solid var(--border); }
 .btn-secondary:active { transform: scale(0.96); }
 .btn-sm { padding: 10px 16px; font-size: 0.85rem; min-height: 40px; }
@@ -256,7 +259,11 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
 @media (hover: hover) {
     .movie-card:hover { transform: translateY(-4px); border-color: var(--cyan); box-shadow: 0 10px 25px rgba(0, 212, 255, 0.2); }
 }
-.movie-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: var(--bg-deep); }
+.movie-card img { 
+    width: 100%; aspect-ratio: 2/3; object-fit: cover; background: var(--bg-deep); 
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
 .card-info { padding: 10px; }
 .card-title { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
 .card-meta { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
@@ -286,7 +293,11 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
     width: 130px; flex-shrink: 0; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     border: 2px solid rgba(139, 92, 246, 0.3);
 }
-.hero-poster img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 10px; }
+.hero-poster img { 
+    width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 10px; 
+    -webkit-mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+}
 .hero-info { flex: 1; min-width: 0; }
 .hero-title { font-size: 1.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 6px; }
 .hero-tagline { font-size: 0.85rem; color: var(--accent-light); font-style: italic; margin-bottom: 10px; }
@@ -383,9 +394,9 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
 .trailer-thumb img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
 .trailer-play-btn {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: rgba(255, 0, 0, 0.9); width: 64px; height: 46px; border-radius: 12px;
+    background: rgba(229, 9, 20, 0.95); width: 64px; height: 46px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5); transition: transform 0.2s ease;
+    box-shadow: 0 10px 40px -5px rgba(229, 9, 20, 0.9); transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .trailer-thumb:active .trailer-play-btn { transform: translate(-50%, -50%) scale(0.9); }
 .trailer-play-icon {
