@@ -16,6 +16,8 @@ const S = {
     // Audio/Songs state
     currentSong: null,
     audioPlaying: false,
+    // Navigation history stack
+    navHistory: [],
 };
 
 // Global audio element — persists across page navigations
@@ -43,7 +45,16 @@ function toast(msg, type = 'success') {
 }
 
 // ===== NAVIGATE =====
-function navigate(page, params = {}) {
+function navigate(page, params = {}, skipHistory = false) {
+    // Push current page to history before navigating (skip for login/splash/back)
+    if (!skipHistory && S.page && S.page !== 'login' && S.page !== 'splash' && S.page !== page) {
+        S.navHistory.push({
+            page: S.page, searchQuery: S.searchQuery, searchType: S.searchType,
+            filterGenre: S.filterGenre, detailId: S.detailId, detailData: S.detailData
+        });
+        // Keep history stack manageable
+        if (S.navHistory.length > 20) S.navHistory.shift();
+    }
     Object.assign(S, { page, ...params });
     render();
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -59,6 +70,7 @@ function render() {
         case 'home': html = appShell(homePage); break;
         case 'search': html = appShell(searchPage); break;
         case 'detail': html = appShell(detailPage); break;
+        case 'actor': html = appShell(actorPage); break;
         case 'watchlist': html = appShell(watchlistPage); break;
         case 'liked': html = appShell(likedPage); break;
         case 'recently': html = appShell(recentPage); break;
@@ -236,16 +248,16 @@ function detailPage() {
     let castHtml = '';
     const castList = m.cast_rich && m.cast_rich.length ? m.cast_rich : (m.cast || []).map(n => ({ name: n, photo: `https://placehold.co/120x160/1a1a2e/a5b4fc?text=${encodeURIComponent(n.split(' ')[0])}` }));
     if (castList.length) {
-        castHtml = `<div class="detail-section"><div class="detail-section-title">🎭 Top Cast</div></div><div class="cast-scroll">${castList.map(c => `<div class="cast-card" onclick="navigate('search',{searchQuery:'${c.name.replace(/'/g,"\\'")}',searchType:'actor'})"><img src="${c.photo}" alt="${c.name}" loading="lazy"><div class="cast-card-name">${c.name}</div></div>`).join('')}</div>`;
+        castHtml = `<div class="detail-section"><div class="detail-section-title"><b>🎭 Top Cast</b></div></div><div class="cast-scroll">${castList.map(c => `<div class="cast-card" onclick="openActorProfile('${c.name.replace(/'/g,"\\'")}', ${c.id || 0})"><img src="${c.photo}" alt="${c.name}" loading="lazy"><div class="cast-card-name">${c.name}</div></div>`).join('')}</div>`;
     }
 
     // Trailer: thumbnail first, click to play
     let trailerHtml = '';
     if (m.trailer) {
         if (S.trailerPlaying) {
-            trailerHtml = `<div class="detail-section"><div class="detail-section-title">🎬 Trailer</div></div><div class="trailer-frame"><iframe src="https://www.youtube-nocookie.com/embed/${m.trailer}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+            trailerHtml = `<div class="detail-section"><div class="detail-section-title"><b>🎬 Trailer</b></div></div><div class="trailer-frame"><iframe src="https://www.youtube-nocookie.com/embed/${m.trailer}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
         } else {
-            trailerHtml = `<div class="detail-section"><div class="detail-section-title">🎬 Trailer</div></div>
+            trailerHtml = `<div class="detail-section"><div class="detail-section-title"><b>🎬 Trailer</b></div></div>
             <div class="trailer-thumb" onclick="playTrailer()">
                 <img src="https://img.youtube.com/vi/${m.trailer}/hqdefault.jpg" alt="Trailer" onerror="this.src='https://img.youtube.com/vi/${m.trailer}/default.jpg'">
                 <div class="trailer-play-btn"><div class="trailer-play-icon"></div></div>
@@ -258,7 +270,7 @@ function detailPage() {
 
     let providersHtml = '';
     if (m.providers && m.providers.length) {
-        providersHtml = `<div class="detail-section"><div class="detail-section-title">📺 Where to Watch</div></div><div class="provider-row">${m.providers.map(p => `<img src="${p.logo}" title="${p.name}" class="provider-logo" loading="lazy">`).join('')}</div>`;
+        providersHtml = `<div class="detail-section"><div class="detail-section-title"><b>📺 Where to Watch</b></div></div><div class="provider-row">${m.providers.map(p => `<img src="${p.logo}" title="${p.name}" class="provider-logo" loading="lazy">`).join('')}</div>`;
     }
 
     const escTitle = m.title.replace(/'/g, "\\'");
@@ -288,12 +300,12 @@ function detailPage() {
             </div>
         </div>
         ${aiHtml}
-        <div class="detail-section"><div class="detail-section-title">📖 Overview</div><p class="overview-text">${m.overview}</p></div>
+        <div class="detail-section"><div class="detail-section-title"><b>📖 Overview</b></div><p class="overview-text">${m.overview}</p></div>
         <div class="action-row">
             <button class="action-btn" id="watchlistBtn" onclick="addWatchlist('${escTitle}')">❤️ Watchlist</button>
             <button class="action-btn" id="likeBtn" onclick="addLike('${escTitle}')">👍 Like</button>
         </div>
-        <div class="detail-section"><div class="detail-section-title">📤 Share</div></div>
+        <div class="detail-section"><div class="detail-section-title"><b>📤 Share</b></div></div>
         <div class="share-row">
             <a href="https://wa.me/?text=${shareText}%20${shareUrl}" target="_blank" class="share-btn share-wa"><svg viewBox="0 0 24 24" width="22" height="22" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
             <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}" target="_blank" class="share-btn share-tw"><svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
@@ -301,7 +313,7 @@ function detailPage() {
         </div>
         ${castHtml}
         ${trailerHtml}
-        <div class="detail-section"><div class="detail-section-title">🎵 Movie Songs</div></div>
+        <div class="detail-section"><div class="detail-section-title"><b>🎵 Movie Songs</b></div></div>
         <div id="songsContainer"><div class="loading-container" style="padding:20px"><div class="spinner"></div><p style="color:var(--text-muted);font-size:0.85rem">Loading songs...</p></div></div>
         <div class="info-box">
             <div class="info-row"><span class="info-label">Director</span>${dirHtml}</div>
@@ -310,16 +322,57 @@ function detailPage() {
             <div class="info-row"><span class="info-label">Genres</span><span class="info-value">${(m.genres_list || []).join(', ') || m.genres}</span></div>
         </div>
         ${providersHtml}
-        <div class="detail-section"><div class="detail-section-title">✍️ Rate & Review</div></div>
+        <div class="detail-section"><div class="detail-section-title"><b>✍️ Rate & Review</b></div></div>
         <div style="padding:0 20px 16px">
             <div class="form-group"><label class="form-label">Your Rating: <span id="ratingVal">8</span>/10</label><input type="range" min="1" max="10" value="8" id="reviewRating" style="width:100%;accent-color:var(--accent)" oninput="document.getElementById('ratingVal').textContent=this.value"></div>
             <div class="form-group"><textarea class="form-textarea" id="reviewText" placeholder="Share your thoughts about this movie..."></textarea></div>
             <button class="btn btn-primary btn-sm" id="submitReviewBtn" onclick="submitReview('${escTitle}')">Submit Review</button>
         </div>
-        <div class="detail-section"><div class="detail-section-title">📰 User Reviews</div></div>
+        <div class="detail-section"><div class="detail-section-title"><b>📰 User Reviews</b></div></div>
         <div id="reviewsList"><div class="loading-container"><div class="spinner"></div></div></div>
-        <div class="detail-section"><div class="detail-section-title">🎬 Similar Movies</div></div>
+        <div class="detail-section"><div class="detail-section-title"><b>🎬 Similar Movies</b></div></div>
         <div id="recGrid" class="movie-grid" style="padding-bottom:120px">${loadingCards(6)}</div>
+    </div>`;
+}
+
+// ===== ACTOR PROFILE PAGE =====
+function actorPage() {
+    if (!S.actorData) return `<div class="loading-container"><div class="spinner"></div><p style="color:var(--text-muted)">Loading actor details...</p></div>`;
+    const a = S.actorData;
+    const age = a.birthday ? (() => {
+        const bd = new Date(a.birthday);
+        const end = a.deathday ? new Date(a.deathday) : new Date();
+        return Math.floor((end - bd) / 31557600000);
+    })() : null;
+    const bioShort = a.biography && a.biography.length > 400 ? a.biography.substring(0, 400) + '...' : a.biography;
+
+    return `<div class="detail-page">
+        <div class="detail-back"><button class="btn btn-secondary btn-sm" onclick="goBack()">← Back</button></div>
+        <div class="actor-hero">
+            ${a.photo ? `<img src="${a.photo}" alt="${a.name}" class="actor-hero-photo">` : `<div class="actor-hero-photo" style="background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:3rem">👤</div>`}
+            <div class="actor-hero-info">
+                <div class="hero-title">${a.name}</div>
+                <div class="stat-pills">
+                    <span class="stat-pill highlight">${a.known_for}</span>
+                    ${a.gender !== 'Unknown' ? `<span class="stat-pill">${a.gender}</span>` : ''}
+                    ${age ? `<span class="stat-pill">🎂 ${age} yrs</span>` : ''}
+                    <span class="stat-pill">🎬 ${a.total_movies} films</span>
+                </div>
+            </div>
+        </div>
+        <div class="detail-section"><div class="detail-section-title"><b>📖 Biography</b></div>
+            <p class="overview-text" id="actorBioText">${bioShort || 'No biography available.'}</p>
+            ${a.biography && a.biography.length > 400 ? `<button class="btn btn-secondary btn-sm" style="margin:8px 0;width:auto;padding:6px 16px" onclick="document.getElementById('actorBioText').textContent=S.actorData.biography; this.remove()">Read More</button>` : ''}
+        </div>
+        <div class="info-box">
+            ${a.birthday ? `<div class="info-row"><span class="info-label">Born</span><span class="info-value">${a.birthday}${a.deathday ? '' : ` (Age ${age})`}</span></div>` : ''}
+            ${a.deathday ? `<div class="info-row"><span class="info-label">Died</span><span class="info-value">${a.deathday} (Age ${age})</span></div>` : ''}
+            ${a.birthplace ? `<div class="info-row"><span class="info-label">Birthplace</span><span class="info-value">${a.birthplace}</span></div>` : ''}
+            <div class="info-row"><span class="info-label">Popularity</span><span class="info-value">⭐ ${a.popularity}</span></div>
+            <div class="info-row"><span class="info-label">Total Films</span><span class="info-value">${a.total_movies}</span></div>
+        </div>
+        <div class="detail-section"><div class="detail-section-title"><b>🎬 Known For</b></div></div>
+        <div id="actorMoviesGrid" class="movie-grid" style="padding-bottom:120px">${a.movies && a.movies.length ? a.movies.map(movieCardHtml).join('') : emptyState('🎬', 'No filmography found')}</div>
     </div>`;
 }
 
@@ -411,6 +464,7 @@ function bindEvents() {
     if (S.page === 'recently') loadRecent();
     if (S.page === 'insights') loadInsights();
     if (S.page === 'admin') loadAdmin();
+    if (S.page === 'actor') loadActorProfile();
 }
 
 // ===== AUTH HANDLERS =====
@@ -689,7 +743,41 @@ async function openMovie(id) {
 }
 
 function goBack() {
-    navigate('home');
+    if (S.navHistory.length > 0) {
+        const prev = S.navHistory.pop();
+        Object.assign(S, {
+            searchQuery: prev.searchQuery || '',
+            searchType: prev.searchType || 'movie',
+            filterGenre: prev.filterGenre || '',
+            detailId: prev.detailId,
+            detailData: prev.detailData,
+        });
+        navigate(prev.page, {}, true); // skipHistory=true so we don't re-push
+    } else {
+        navigate('home', {}, true);
+    }
+}
+
+async function openActorProfile(name, personId) {
+    if (personId && personId > 0) {
+        S.actorData = null;
+        S.actorPersonId = personId;
+        navigate('actor');
+    } else {
+        // Fallback: search by actor name
+        navigate('search', { searchQuery: name, searchType: 'actor' });
+    }
+}
+
+async function loadActorProfile() {
+    if (!S.actorPersonId) return;
+    try {
+        const data = await api(`person/${S.actorPersonId}`);
+        S.actorData = data;
+        document.getElementById('content').innerHTML = actorPage();
+    } catch {
+        document.getElementById('content').innerHTML = emptyState('⚠️', 'Failed to load actor details');
+    }
 }
 
 async function addWatchlist(title) {
@@ -1203,4 +1291,15 @@ async function adminResetPassword() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+
+    // Android hardware back button / browser back
+    window.addEventListener('popstate', (e) => {
+        if (S.page === 'login') return;
+        if (S.page === 'detail') { goBack(); }
+        else if (S.page !== 'home') { goBack(); }
+        // Push a dummy state so we can catch the next back press
+        history.pushState(null, '', '');
+    });
+    // Push initial state
+    history.pushState(null, '', '');
 })();

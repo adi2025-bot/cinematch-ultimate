@@ -282,7 +282,7 @@ def api_detail(mid):
             if 'credits' in t and 'cast' in t['credits']:
                 for c in t['credits']['cast'][:6]:
                     photo = ("https://image.tmdb.org/t/p/w200" + c['profile_path']) if c.get('profile_path') else f"https://placehold.co/200x200/1a1a2e/a5b4fc?text={urllib.parse.quote(c['name'].split()[0])}"
-                    detail['cast_rich'].append({'name': c['name'], 'photo': photo})
+                    detail['cast_rich'].append({'name': c['name'], 'photo': photo, 'id': c.get('id', 0), 'character': c.get('character', '')})
             if 'credits' in t and 'crew' in t['credits']:
                 d = next((x['name'] for x in t['credits']['crew'] if x['job'] == 'Director'), None)
                 if d:
@@ -675,6 +675,57 @@ def api_songs_search():
     except Exception as e:
         print(f"Songs API error: {e}")
         return jsonify([])
+
+# ==========================================
+# PERSON / ACTOR API
+# ==========================================
+person_cache = {}
+
+@app.route('/api/person/<int:pid>')
+def api_person(pid):
+    """Get actor/person details from TMDB — biography, filmography, etc."""
+    if pid in person_cache:
+        return jsonify(person_cache[pid])
+    try:
+        r = tmdb_session.get(
+            f"https://api.themoviedb.org/3/person/{pid}?api_key={API_KEY}&append_to_response=movie_credits",
+            timeout=10
+        )
+        if r.status_code != 200:
+            return jsonify(error='Not found'), 404
+        p = r.json()
+        photo = ("https://image.tmdb.org/t/p/w500" + p['profile_path']) if p.get('profile_path') else ''
+        # Get top movies sorted by popularity
+        movies = []
+        if 'movie_credits' in p and 'cast' in p['movie_credits']:
+            sorted_movies = sorted(p['movie_credits']['cast'], key=lambda x: x.get('popularity', 0), reverse=True)
+            for m in sorted_movies[:12]:
+                poster = ("https://image.tmdb.org/t/p/w300" + m['poster_path']) if m.get('poster_path') else ''
+                if poster:
+                    movies.append({
+                        'id': m.get('id', 0), 'title': m.get('title', ''),
+                        'year': str(m.get('release_date', ''))[:4],
+                        'rating': round(m.get('vote_average', 0), 1),
+                        'poster': poster, 'character': m.get('character', '')
+                    })
+        result = {
+            'id': pid, 'name': p.get('name', ''),
+            'photo': photo,
+            'biography': p.get('biography', 'No biography available.'),
+            'birthday': p.get('birthday', ''),
+            'deathday': p.get('deathday', ''),
+            'birthplace': p.get('place_of_birth', ''),
+            'known_for': p.get('known_for_department', 'Acting'),
+            'popularity': round(p.get('popularity', 0), 1),
+            'gender': 'Male' if p.get('gender') == 2 else 'Female' if p.get('gender') == 1 else 'Unknown',
+            'movies': movies,
+            'total_movies': len(p.get('movie_credits', {}).get('cast', [])),
+        }
+        person_cache[pid] = result
+        return jsonify(result)
+    except Exception as e:
+        print(f"Person API error: {e}")
+        return jsonify(error='Failed to fetch'), 500
 
 # ==========================================
 # ADMIN API

@@ -731,6 +731,16 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
     font-variant-numeric: tabular-nums;
 }
 
+/* === ACTOR PROFILE === */
+.actor-hero {
+    display: flex; gap: 16px; padding: 20px; align-items: flex-start;
+}
+.actor-hero-photo {
+    width: 140px; height: 200px; border-radius: 14px; object-fit: cover; flex-shrink: 0;
+    border: 2px solid rgba(139, 92, 246, 0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.actor-hero-info { flex: 1; min-width: 0; padding-top: 8px; }
+
 /* Push bottom-nav down when mini player is showing */
 .bottom-nav { transition: bottom 0.3s ease; }
 
