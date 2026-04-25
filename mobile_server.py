@@ -597,6 +597,86 @@ def api_ml_sd():
         return jsonify({})
 
 # ==========================================
+# SONGS API (JioSaavn)
+# ==========================================
+SAAVN_BASE = "https://saavn.sumit.co/api"
+songs_cache = {}
+
+@app.route('/api/songs/search')
+def api_songs_search():
+    """Search songs by movie name using JioSaavn API."""
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify([])
+    
+    # Check cache
+    cache_key = q.lower()
+    if cache_key in songs_cache:
+        return jsonify(songs_cache[cache_key])
+    
+    try:
+        # Add "songs" to query for better movie soundtrack results
+        search_query = f"{q} songs"
+        r = tmdb_session.get(
+            f"{SAAVN_BASE}/search/songs",
+            params={'query': search_query, 'limit': 10},
+            timeout=10
+        )
+        if r.status_code != 200:
+            return jsonify([])
+        
+        data = r.json()
+        if not data.get('success') or not data.get('data', {}).get('results'):
+            return jsonify([])
+        
+        songs = []
+        for s in data['data']['results']:
+            # Get best quality image (500x500)
+            image = ''
+            if s.get('image'):
+                for img in s['image']:
+                    if img.get('quality') == '500x500':
+                        image = img['url']
+                        break
+                if not image and s['image']:
+                    image = s['image'][-1].get('url', '')
+            
+            # Get 160kbps streaming URL (good quality, low bandwidth)
+            audio_url = ''
+            if s.get('downloadUrl'):
+                for dl in s['downloadUrl']:
+                    if dl.get('quality') == '160kbps':
+                        audio_url = dl['url']
+                        break
+                if not audio_url and s['downloadUrl']:
+                    audio_url = s['downloadUrl'][-1].get('url', '')
+            
+            # Get primary artist names
+            artists = []
+            if s.get('artists', {}).get('primary'):
+                artists = [a['name'] for a in s['artists']['primary'][:3]]
+            
+            songs.append({
+                'id': s.get('id', ''),
+                'name': s.get('name', 'Unknown'),
+                'artist': ', '.join(artists) if artists else 'Unknown',
+                'album': s.get('album', {}).get('name', ''),
+                'image': image,
+                'duration': s.get('duration', 0),
+                'url': audio_url,
+                'year': s.get('year', ''),
+                'language': s.get('language', ''),
+                'playCount': s.get('playCount', 0),
+            })
+        
+        # Cache the result
+        songs_cache[cache_key] = songs
+        return jsonify(songs)
+    except Exception as e:
+        print(f"Songs API error: {e}")
+        return jsonify([])
+
+# ==========================================
 # ADMIN API
 # ==========================================
 @app.route('/api/admin/stats')

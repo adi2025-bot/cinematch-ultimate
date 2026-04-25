@@ -13,7 +13,15 @@ const S = {
     genreList: [],
     trailerPlaying: false,
     suggestTimer: null,
+    // Audio/Songs state
+    currentSong: null,
+    audioPlaying: false,
 };
+
+// Global audio element — persists across page navigations
+const cmAudio = new Audio();
+cmAudio.addEventListener('ended', () => { S.audioPlaying = false; updateMiniPlayer(); });
+cmAudio.addEventListener('timeupdate', updateAudioProgress);
 
 // ===== API HELPER =====
 async function api(endpoint, opts = {}) {
@@ -92,6 +100,7 @@ function appShell(contentFn) {
             <button class="search-btn" id="searchBtn">🔍 Go</button>
         </div>`}
         <div id="content">${contentFn()}</div>
+        ${miniPlayerHtml()}
         <div class="bottom-nav">
             <button class="nav-btn ${S.page === 'home' ? 'active' : ''}" onclick="navigate('home')"><span class="nav-icon">🏠</span>Home</button>
             <button class="nav-btn ${S.page === 'recently' ? 'active' : ''}" onclick="navigate('recently')"><span class="nav-icon">🕐</span>Recent</button>
@@ -292,6 +301,8 @@ function detailPage() {
         </div>
         ${castHtml}
         ${trailerHtml}
+        <div class="detail-section"><div class="detail-section-title">🎵 Movie Songs</div></div>
+        <div id="songsContainer"><div class="loading-container" style="padding:20px"><div class="spinner"></div><p style="color:var(--text-muted);font-size:0.85rem">Loading songs...</p></div></div>
         <div class="info-box">
             <div class="info-row"><span class="info-label">Director</span>${dirHtml}</div>
             <div class="info-row"><span class="info-label">Budget</span><span class="info-value">${budgetStr}</span></div>
@@ -809,9 +820,10 @@ async function loadDetail() {
         localStorage.setItem('cm_recent', JSON.stringify(S.recentlyViewed));
         // Re-render with data
         document.getElementById('content').innerHTML = detailPage();
-        // Load reviews & recommendations
+        // Load reviews, recommendations & songs
         loadReviews(m.title);
         loadRecommendations(m.id);
+        loadSongs(m.title);
     } catch { document.getElementById('content').innerHTML = emptyState('⚠️', 'Failed to load movie'); }
 }
 
@@ -836,6 +848,143 @@ async function loadRecommendations(id) {
         const movies = await api(`movies/${id}/recommend`);
         grid.innerHTML = movies.length ? movies.map(movieCardHtml).join('') : emptyState('🎬', 'No recommendations');
     } catch { grid.innerHTML = ''; }
+}
+
+// ===== SONGS =====
+function miniPlayerHtml() {
+    if (!S.currentSong) return '';
+    const song = S.currentSong;
+    const playIcon = S.audioPlaying ? '⏸️' : '▶️';
+    return `
+    <div class="mini-player" id="miniPlayer">
+        <img src="${song.image}" alt="${song.name}" class="mini-player-art">
+        <div class="mini-player-info">
+            <div class="mini-player-title">${song.name}</div>
+            <div class="mini-player-artist">${song.artist}</div>
+        </div>
+        <button class="mini-player-btn" onclick="togglePlayPause()">${playIcon}</button>
+        <button class="mini-player-close" onclick="stopSong()">✕</button>
+        <div class="mini-player-progress" id="miniProgress"><div class="mini-player-progress-fill" id="miniProgressFill"></div></div>
+    </div>`;
+}
+
+function formatDuration(secs) {
+    if (!secs) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+async function loadSongs(title) {
+    const container = document.getElementById('songsContainer');
+    if (!container) return;
+    try {
+        const songs = await api(`songs/search?q=${encodeURIComponent(title)}`);
+        if (!songs || !songs.length) {
+            container.innerHTML = `<div style="padding:0 20px 16px"><p style="color:var(--text-muted);font-size:0.85rem">No songs found for this movie. <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' songs')}" target="_blank" style="color:var(--cyan)">Search YouTube →</a></p></div>`;
+            return;
+        }
+        container.innerHTML = `<div class="songs-list">${songs.map((song, i) => {
+            const isPlaying = S.currentSong && S.currentSong.id === song.id && S.audioPlaying;
+            const playIcon = isPlaying ? '⏸️' : '▶️';
+            const activeClass = isPlaying ? 'song-active' : '';
+            return `
+            <div class="song-card ${activeClass}" onclick="playSong(${i}, '${btoa(encodeURIComponent(JSON.stringify(songs)))}')" id="song-${song.id}">
+                <img src="${song.image || 'https://placehold.co/60x60/1a1a2e/a5b4fc?text=🎵'}" alt="${song.name}" class="song-art" loading="lazy">
+                <div class="song-info">
+                    <div class="song-name">${song.name}</div>
+                    <div class="song-artist">${song.artist}</div>
+                    <div class="song-meta">${song.album ? song.album + ' • ' : ''}${formatDuration(song.duration)}</div>
+                </div>
+                <div class="song-play-btn">${playIcon}</div>
+            </div>`;
+        }).join('')}</div>`;
+    } catch (err) {
+        console.error('Songs load error:', err);
+        container.innerHTML = `<div style="padding:0 20px 16px"><p style="color:var(--text-muted);font-size:0.85rem">Could not load songs.</p></div>`;
+    }
+}
+
+function playSong(index, encodedSongs) {
+    try {
+        const songs = JSON.parse(decodeURIComponent(atob(encodedSongs)));
+        const song = songs[index];
+        if (!song || !song.url) { toast('Song not available', 'error'); return; }
+
+        // If same song, toggle play/pause
+        if (S.currentSong && S.currentSong.id === song.id) {
+            togglePlayPause();
+            return;
+        }
+
+        // Play new song
+        S.currentSong = song;
+        S.audioPlaying = true;
+        cmAudio.src = song.url;
+        cmAudio.play().catch(e => { console.error('Audio play error:', e); toast('Unable to play song', 'error'); });
+
+        // Update UI
+        updateSongCards();
+        updateMiniPlayer();
+        toast(`🎵 Now playing: ${song.name}`);
+    } catch (e) {
+        console.error('playSong error:', e);
+    }
+}
+
+function togglePlayPause() {
+    if (!S.currentSong) return;
+    if (S.audioPlaying) {
+        cmAudio.pause();
+        S.audioPlaying = false;
+    } else {
+        cmAudio.play().catch(() => {});
+        S.audioPlaying = true;
+    }
+    updateSongCards();
+    updateMiniPlayer();
+}
+
+function stopSong() {
+    cmAudio.pause();
+    cmAudio.src = '';
+    S.currentSong = null;
+    S.audioPlaying = false;
+    updateMiniPlayer();
+    updateSongCards();
+}
+
+function updateMiniPlayer() {
+    const existing = document.getElementById('miniPlayer');
+    if (S.currentSong) {
+        const html = miniPlayerHtml();
+        if (existing) {
+            existing.outerHTML = html;
+        } else {
+            // Insert before bottom-nav
+            const nav = document.querySelector('.bottom-nav');
+            if (nav) nav.insertAdjacentHTML('beforebegin', html);
+        }
+    } else if (existing) {
+        existing.remove();
+    }
+}
+
+function updateSongCards() {
+    document.querySelectorAll('.song-card').forEach(card => {
+        const id = card.id.replace('song-', '');
+        const isPlaying = S.currentSong && S.currentSong.id === id && S.audioPlaying;
+        card.classList.toggle('song-active', isPlaying);
+        const btn = card.querySelector('.song-play-btn');
+        if (btn) btn.textContent = isPlaying ? '⏸️' : '▶️';
+    });
+}
+
+function updateAudioProgress() {
+    const fill = document.getElementById('miniProgressFill');
+    if (fill && cmAudio.duration) {
+        fill.style.width = ((cmAudio.currentTime / cmAudio.duration) * 100) + '%';
+    }
 }
 
 async function loadWatchlist() {
