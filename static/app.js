@@ -1337,14 +1337,28 @@ function closeVoiceSearch() {
 }
 
 function cleanVoiceQuery(query) {
-    // Advanced NLP cleaner to remove conversational fluff including actor/director prefixes
-    const fluffRegex = /^(i want to watch|show me|give me|can you show|find me|suggest me|suggest|batao|play|some|movies|movie|a|an|the|please|directed by|starring|actor|director|by|of)\b/gi;
-    let cleaned = query.replace(fluffRegex, '').trim();
-    // Run twice for cases like "show me some movies"
-    cleaned = cleaned.replace(fluffRegex, '').trim();
+    let cleaned = query.toLowerCase().trim();
+    const fluff = ['i want to watch', 'can you show me', 'can you show', 'show me', 'give me', 'find me', 'suggest me', 'suggest', 'batao', 'play', 'some', 'movies', 'movie', 'a', 'an', 'the', 'please', 'directed by', 'starring', 'actor', 'director', 'by', 'of'];
+    
+    // Sort by length descending so "can you show me" runs before "show me"
+    fluff.sort((a, b) => b.length - a.length);
+    
+    let changed = true;
+    while(changed) {
+        changed = false;
+        for (let word of fluff) {
+            if (cleaned.startsWith(word + ' ')) {
+                cleaned = cleaned.substring(word.length).trim();
+                changed = true;
+            } else if (cleaned === word) {
+                cleaned = "";
+                changed = true;
+            }
+        }
+    }
     // Remove trailing "movies" or "movie"
     cleaned = cleaned.replace(/\s*movies?$/i, '').trim();
-    // Fallback to original if stripped empty
+    
     return cleaned || query;
 }
 
@@ -1417,7 +1431,7 @@ function startVoiceSearch(targetInputId = 'searchInput') {
             <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: -10px;">Tap to talk</div>
             
             <div class="voice-controls">
-                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('\${targetInputId}').focus();">
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('${targetInputId}').focus();">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
                 </button>
                 <button class="voice-ctrl-btn" onclick="closeVoiceSearch()">

@@ -1,6 +1,6 @@
 // CineMatch Service Worker — Offline caching
-const CACHE_NAME = 'cinematch-v4';
-const PRECACHE = ['/', '/static/style.css?v=4', '/static/app.js?v=4'];
+const CACHE_NAME = 'cinematch-v5';
+const PRECACHE = ['/', '/static/style.css?v=5', '/static/app.js?v=5'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE)));
