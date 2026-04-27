@@ -95,6 +95,7 @@ function appShell(contentFn) {
         <div class="search-bar" style="flex-wrap:wrap; gap:8px;">
             <div class="search-input-wrapper">
                 <input class="search-input" id="searchInput" placeholder="Search..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off">
+                <button class="voice-btn" id="voiceSearchBtn" onclick="startVoiceSearch()" title="Voice Search">🎤</button>
                 <div class="search-suggestions" id="searchSuggestions"></div>
             </div>
             <select id="searchTypeSel" class="form-select" style="width:110px; padding:12px; border-radius:12px; background:var(--bg-deep); color:white; border:1px solid var(--border);">
@@ -107,6 +108,7 @@ function appShell(contentFn) {
         <div class="search-bar">
             <div class="search-input-wrapper">
                 <input class="search-input" id="searchInput" placeholder="Search movies, actors, directors..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off">
+                <button class="voice-btn" id="voiceSearchBtn" onclick="startVoiceSearch()" title="Voice Search">🎤</button>
                 <div class="search-suggestions" id="searchSuggestions"></div>
             </div>
             <button class="search-btn" id="searchBtn">🔍 Go</button>
@@ -304,6 +306,7 @@ function detailPage() {
         <div class="action-row">
             <button class="action-btn" id="watchlistBtn" onclick="addWatchlist('${escTitle}')">❤️ Watchlist</button>
             <button class="action-btn" id="likeBtn" onclick="addLike('${escTitle}')">👍 Like</button>
+            <button class="action-btn" id="remindBtn" onclick="remindMeLater()">🔔 Remind</button>
         </div>
         <div class="detail-section"><div class="detail-section-title"><b>📤 Share</b></div></div>
         <div class="share-row">
@@ -1306,3 +1309,96 @@ async function adminResetPassword() {
     // Push initial state
     history.pushState(null, '', '');
 })();
+
+// ===== VOICE SEARCH =====
+function startVoiceSearch() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast('Voice search is not supported in this browser.', 'error');
+        return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    const btns = document.querySelectorAll('.voice-btn');
+    btns.forEach(b => b.classList.add('recording'));
+
+    recognition.onstart = function() {
+        toast('Listening...', 'info');
+    };
+
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = transcript;
+            S.searchQuery = transcript;
+            toast(`Heard: "${transcript}"`);
+            
+            // Trigger search
+            const searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) {
+                searchBtn.click();
+            } else if (S.page === 'search') {
+                loadSearch(1);
+            } else {
+                navigate('search');
+            }
+        }
+    };
+
+    recognition.onerror = function(event) {
+        if (event.error !== 'no-speech') {
+            toast('Voice search error: ' + event.error, 'error');
+        }
+    };
+
+    recognition.onend = function() {
+        btns.forEach(b => b.classList.remove('recording'));
+    };
+
+    try {
+        recognition.start();
+    } catch (e) {
+        btns.forEach(b => b.classList.remove('recording'));
+    }
+}
+
+// ===== PUSH NOTIFICATIONS (SIMULATED LOCAL PUSH) =====
+function remindMeLater() {
+    if (!('Notification' in window)) {
+        toast('Notifications not supported by browser', 'error');
+        return;
+    }
+    
+    Notification.requestPermission().then(function(permission) {
+        if (permission === 'granted') {
+            toast('Reminder set! You will be notified in 5 seconds.', 'success');
+            
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                const title = S.detailData ? S.detailData.title : 'CineMatch Movie';
+                const poster = S.detailData ? S.detailData.poster : '';
+                
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SCHEDULE_PUSH',
+                    title: `🍿 Time to watch ${title}!`,
+                    options: {
+                        body: 'You asked us to remind you about this movie. Tap to open CineMatch.',
+                        icon: poster || 'https://placehold.co/100x100/1a1a2e/a5b4fc?text=🍿',
+                        image: poster,
+                        badge: 'https://placehold.co/100x100/1a1a2e/a5b4fc?text=🎥',
+                        vibrate: [200, 100, 200, 100, 200, 100, 400],
+                        data: { url: window.location.href }
+                    },
+                    delayMs: 5000
+                });
+            } else {
+                toast('Service Worker not ready for push', 'warning');
+            }
+        } else {
+            toast('Notification permission denied', 'error');
+        }
+    });
+}

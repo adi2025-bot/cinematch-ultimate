@@ -203,7 +203,21 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
     flex: 1; position: relative; min-width: 0;
 }
 .search-input-wrapper .search-input {
-    width: 100%;
+    width: 100%; padding-right: 40px;
+}
+.voice-btn {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none; font-size: 1.2rem; cursor: pointer;
+    color: var(--text-muted); transition: all 0.2s; padding: 5px; z-index: 2;
+}
+.voice-btn:hover { color: var(--accent-light); }
+.voice-btn.recording {
+    color: var(--error); animation: voicePulse 1.5s infinite;
+}
+@keyframes voicePulse {
+    0% { transform: translateY(-50%) scale(1); text-shadow: 0 0 0 transparent; }
+    50% { transform: translateY(-50%) scale(1.2); text-shadow: 0 0 10px rgba(248, 113, 113, 0.8); }
+    100% { transform: translateY(-50%) scale(1); text-shadow: 0 0 0 transparent; }
 }
 .search-suggestions {
     display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;

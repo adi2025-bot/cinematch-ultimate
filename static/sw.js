@@ -45,3 +45,42 @@ self.addEventListener('fetch', e => {
         }).catch(() => caches.match(e.request))
     );
 });
+
+// Listen for messages from the frontend to schedule notifications
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SCHEDULE_PUSH') {
+        const { title, options, delayMs } = event.data;
+        
+        // Since Service Workers can't use setTimeout easily without keeping the SW alive,
+        // we'll use a simple setTimeout. For a robust production app, the Push API is used.
+        // For our simulated local push, this is perfect.
+        setTimeout(() => {
+            self.registration.showNotification(title, options);
+        }, delayMs || 5000);
+    }
+});
+
+// Handle clicking the notification
+self.addEventListener('notificationclick', event => {
+    event.notification.close(); // Close the notification
+
+    // This looks to see if the current is already open and focuses if it is
+    event.waitUntil(
+        clients.matchAll({ type: 'window' }).then(windowClients => {
+            const urlToOpen = event.notification.data ? event.notification.data.url : '/';
+            
+            // Check if there is already a window/tab open with the target URL
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            
+            // If not, open a new window/tab
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
+});
