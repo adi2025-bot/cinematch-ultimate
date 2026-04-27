@@ -785,9 +785,12 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
 .voice-subtitle { font-size: 0.95rem; color: var(--text-muted); line-height: 1.4; }
 
 .voice-chips {
-    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
-    margin-top: 40px; z-index: 2;
+    display: flex; gap: 12px; margin-top: 40px; z-index: 2;
+    overflow-x: auto; white-space: nowrap; padding-bottom: 10px;
+    scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+    max-width: 100vw; padding: 0 20px 10px; box-sizing: border-box;
 }
+.voice-chips::-webkit-scrollbar { display: none; }
 .voice-chip {
     padding: 12px 20px; border-radius: 30px; font-size: 0.85rem; font-weight: 500;
     background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255,255,255,0.15);

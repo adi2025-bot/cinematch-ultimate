@@ -888,6 +888,17 @@ async function loadSearch(page = 1) {
         const html = movies.length ? movies.map(movieCardHtml).join('') : '';
         if (page === 1) {
             grid.innerHTML = html || emptyState('🔍', 'No results found. Try a different search.');
+            
+            // TTS Voice Feedback
+            if (S.isVoiceSearch) {
+                S.isVoiceSearch = false; // Reset flag
+                if (movies.length > 0 && 'speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance("Here are your movies");
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
         } else if (html) {
             grid.innerHTML += html;
         }
@@ -1325,12 +1336,27 @@ function closeVoiceSearch() {
     }
 }
 
+function cleanVoiceQuery(query) {
+    // Advanced NLP cleaner to remove conversational fluff
+    const fluffRegex = /^(i want to watch|show me|give me|can you show|find me|suggest me|suggest|batao|play|some|movies|movie|a|the|please)\b/gi;
+    let cleaned = query.replace(fluffRegex, '').trim();
+    // Run twice for cases like "show me some movies"
+    cleaned = cleaned.replace(fluffRegex, '').trim();
+    // Remove trailing "movies" or "movie"
+    cleaned = cleaned.replace(/\s*movies?$/i, '').trim();
+    // If they just said "movies", fallback to original so search isn't completely empty
+    return cleaned || query;
+}
+
 function processVoiceQuery(query, targetInputId = 'searchInput') {
     closeVoiceSearch();
+    S.isVoiceSearch = true; // Flag for TTS playback
+    
+    const cleanQuery = cleanVoiceQuery(query);
     const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
     if (searchInput) {
-        searchInput.value = query;
-        S.searchQuery = query;
+        searchInput.value = cleanQuery;
+        S.searchQuery = cleanQuery;
         
         if (targetInputId === 'adultSpecificSearch') {
             const adultSearchBtn = document.getElementById('adultSearchBtn');
@@ -1370,10 +1396,10 @@ function startVoiceSearch(targetInputId = 'searchInput') {
             <div class="voice-subtitle">Tap a suggestion, use your mic, or type to explore.</div>
             
             <div class="voice-chips">
-                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies', '\${targetInputId}')">Stress-buster comedies</div>
-                <div class="voice-chip" onclick="processVoiceQuery('South blockbusters in Hindi', '\${targetInputId}')">South blockbusters in Hindi</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Movies like Avengers', '\${targetInputId}')">Movies like Avengers</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family', '\${targetInputId}')">Movies to watch with family</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Award winning movies', '${targetInputId}')">Award winning movies</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies', '${targetInputId}')">Stress-buster comedies</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Bacchon ke liye movies batao', '${targetInputId}')">Bacchon ke liye movies batao</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family', '${targetInputId}')">Movies to watch with family</div>
             </div>
         </div>
         
