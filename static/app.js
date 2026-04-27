@@ -313,7 +313,7 @@ function detailPage() {
         </div>
         ${castHtml}
         ${trailerHtml}
-        <div class="detail-section"><div class="detail-section-title"><b>🎵 Movie Songs</b></div></div>
+        <div class="detail-section" id="songsTitleSection"><div class="detail-section-title"><b>🎵 Movie Songs</b></div></div>
         <div id="songsContainer"><div class="loading-container" style="padding:20px"><div class="spinner"></div><p style="color:var(--text-muted);font-size:0.85rem">Loading songs...</p></div></div>
         <div class="info-box">
             <div class="info-row"><span class="info-label">Director</span>${dirHtml}</div>
@@ -982,7 +982,9 @@ async function loadSongs(title) {
     try {
         const songs = await api(`songs/search?q=${encodeURIComponent(title)}`);
         if (!songs || !songs.length) {
-            container.innerHTML = `<div style="padding:0 20px 16px"><p style="color:var(--text-muted);font-size:0.85rem">No songs found for this movie. <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' songs')}" target="_blank" style="color:var(--cyan)">Search YouTube →</a></p></div>`;
+            const titleSection = document.getElementById('songsTitleSection');
+            if (titleSection) titleSection.style.display = 'none';
+            container.style.display = 'none';
             return;
         }
         container.innerHTML = `<div class="songs-list">${songs.map((song, i) => {

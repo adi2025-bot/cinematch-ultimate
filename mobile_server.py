@@ -615,11 +615,14 @@ def api_songs_search():
         return jsonify(songs_cache[cache_key])
     
     try:
+        import re
+        q_clean = re.sub(r'[^a-z0-9]', '', q.lower())
+        
         # Add "songs" to query for better movie soundtrack results
         search_query = f"{q} songs"
         r = tmdb_session.get(
             f"{SAAVN_BASE}/search/songs",
-            params={'query': search_query, 'limit': 10},
+            params={'query': search_query, 'limit': 30},
             timeout=10
         )
         if r.status_code != 200:
@@ -631,6 +634,13 @@ def api_songs_search():
         
         songs = []
         for s in data['data']['results']:
+            album_name = s.get('album', {}).get('name', '')
+            album_clean = re.sub(r'[^a-z0-9]', '', album_name.lower())
+            
+            # Strict filter: only include songs where the album matches the movie
+            if not album_clean or (q_clean not in album_clean and album_clean not in q_clean):
+                continue
+                
             # Get best quality image (500x500)
             image = ''
             if s.get('image'):
