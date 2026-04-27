@@ -187,9 +187,10 @@ function searchPage() {
         <div class="search-bar" style="margin: 0 20px 16px; width: auto; max-width: none;">
             <div class="search-input-wrapper">
                 <input class="search-input" id="adultSpecificSearch" placeholder="Search adult movies..." value="${(S.searchQuery || '').replace(/"/g,'&quot;')}" autocomplete="off" oninput="handleAdultSearchInput(event)">
+                <button class="voice-btn" id="voiceAdultSearchBtn" onclick="startVoiceSearch('adultSpecificSearch')" title="Voice Search">🎤</button>
                 <div class="search-suggestions" id="adultSearchSuggestions"></div>
             </div>
-            <button class="search-btn" onclick="S.searchQuery=document.getElementById('adultSpecificSearch').value.trim(); S.searchPage=1; loadSearch(1); hideAdultSuggestions();">🔍 Search</button>
+            <button class="search-btn" id="adultSearchBtn" onclick="S.searchQuery=document.getElementById('adultSpecificSearch').value.trim(); S.searchPage=1; loadSearch(1); hideAdultSuggestions();">🔍 Search</button>
         </div>`;
     }
 
@@ -1324,12 +1325,20 @@ function closeVoiceSearch() {
     }
 }
 
-function processVoiceQuery(query) {
+function processVoiceQuery(query, targetInputId = 'searchInput') {
     closeVoiceSearch();
-    const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
     if (searchInput) {
         searchInput.value = query;
         S.searchQuery = query;
+        
+        if (targetInputId === 'adultSpecificSearch') {
+            const adultSearchBtn = document.getElementById('adultSearchBtn');
+            if (adultSearchBtn) adultSearchBtn.click();
+            else { S.searchPage = 1; loadSearch(1); }
+            return;
+        }
+
         const searchBtn = document.getElementById('searchBtn');
         if (searchBtn) {
             searchBtn.click();
@@ -1341,7 +1350,7 @@ function processVoiceQuery(query) {
     }
 }
 
-function startVoiceSearch() {
+function startVoiceSearch(targetInputId = 'searchInput') {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         toast('Voice search is not supported in this browser.', 'error');
@@ -1355,16 +1364,16 @@ function startVoiceSearch() {
     modal = document.createElement('div');
     modal.id = 'voiceSearchModal';
     modal.className = 'voice-modal';
-    modal.innerHTML = `
+    modal.innerHTML = \`
         <div class="voice-header">
             <div class="voice-title">What are you in the mood for?</div>
             <div class="voice-subtitle">Tap a suggestion, use your mic, or type to explore.</div>
             
             <div class="voice-chips">
-                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies')">Stress-buster comedies</div>
-                <div class="voice-chip" onclick="processVoiceQuery('South blockbusters in Hindi')">South blockbusters in Hindi</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Movies like Avengers')">Movies like Avengers</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family')">Movies to watch with family</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies', '\${targetInputId}')">Stress-buster comedies</div>
+                <div class="voice-chip" onclick="processVoiceQuery('South blockbusters in Hindi', '\${targetInputId}')">South blockbusters in Hindi</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Movies like Avengers', '\${targetInputId}')">Movies like Avengers</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family', '\${targetInputId}')">Movies to watch with family</div>
             </div>
         </div>
         
@@ -1376,7 +1385,7 @@ function startVoiceSearch() {
             <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: -10px;">Tap to talk</div>
             
             <div class="voice-controls">
-                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('searchInput').focus();">
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('\${targetInputId}').focus();">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
                 </button>
                 <button class="voice-ctrl-btn" onclick="closeVoiceSearch()">
@@ -1422,7 +1431,7 @@ function startVoiceSearch() {
         
         if (finalTranscript) {
             setTimeout(() => {
-                processVoiceQuery(finalTranscript);
+                processVoiceQuery(finalTranscript, targetInputId);
             }, 800); // Small delay to let user read what was recognized
         }
     };
