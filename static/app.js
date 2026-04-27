@@ -980,7 +980,8 @@ async function loadSongs(title) {
     const container = document.getElementById('songsContainer');
     if (!container) return;
     try {
-        const songs = await api(`songs/search?q=${encodeURIComponent(title)}`);
+        const year = S.detailData ? (S.detailData.year || '') : '';
+        const songs = await api(`songs/search?q=${encodeURIComponent(title)}&year=${year}`);
         if (!songs || !songs.length) {
             const titleSection = document.getElementById('songsTitleSection');
             if (titleSection) titleSection.style.display = 'none';

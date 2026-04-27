@@ -632,15 +632,42 @@ def api_songs_search():
         if not data.get('success') or not data.get('data', {}).get('results'):
             return jsonify([])
         
+        year_str = request.args.get('year', '')
+        movie_year = int(year_str) if year_str.isdigit() else 0
+        
+        results_list = data.get('data', {}).get('results', [])
+        
+        # Count frequency of each album ID to identify official soundtracks
+        album_counts = {}
+        for s in results_list:
+            aid = str(s.get('album', {}).get('id', ''))
+            if aid:
+                album_counts[aid] = album_counts.get(aid, 0) + 1
+                
         songs = []
-        for s in data['data']['results']:
+        for s in results_list:
             album_name = s.get('album', {}).get('name', '')
             album_clean = re.sub(r'[^a-z0-9]', '', album_name.lower())
+            song_name = s.get('name', '')
+            song_clean = re.sub(r'[^a-z0-9]', '', song_name.lower())
             
-            # Strict filter: only include songs where the album matches the movie
+            # 1. Must loosely match the album name
             if not album_clean or (q_clean not in album_clean and album_clean not in q_clean):
                 continue
                 
+            # 2. Check if it's a suspicious single
+            aid = str(s.get('album', {}).get('id', ''))
+            is_soundtrack = album_counts.get(aid, 0) >= 2
+            is_suspicious_single = (song_clean == q_clean) and not is_soundtrack
+            
+            if is_suspicious_single:
+                song_year = int(s.get('year', 0)) if str(s.get('year', '')).isdigit() else 0
+                if movie_year > 0 and song_year > 0:
+                    if abs(song_year - movie_year) > 2:
+                        continue
+                else:
+                    continue
+                    
             # Get best quality image (500x500)
             image = ''
             if s.get('image'):
