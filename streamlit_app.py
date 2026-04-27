@@ -1543,18 +1543,24 @@ def fetch_full_details(movie_id, title="Movie"):
 @st.cache_resource
 def load_data():
     try:
-        if not os.path.exists('movie_list.pkl'): return None, None
-        movies_dict = pickle.load(open('movie_list.pkl','rb'))
+        # Prefer optimized movie list
+        if os.path.exists('movie_list_optimized.pkl'):
+            movies_dict = pickle.load(open('movie_list_optimized.pkl', 'rb'))
+        elif os.path.exists('movie_list.pkl'):
+            movies_dict = pickle.load(open('movie_list.pkl', 'rb'))
+        else:
+            return None, None
         
-        # Use compressed similarity file for GitHub (under 100MB limit)
-        import gzip
-        if os.path.exists('similarity.pkl.gz'):
+        # Use optimized similarity map (tiny) or compressed pkl (large)
+        similarity = None
+        if os.path.exists('similarity_optimized.pkl'):
+            similarity = pickle.load(open('similarity_optimized.pkl', 'rb'))
+        elif os.path.exists('similarity.pkl.gz'):
+            import gzip
             with gzip.open('similarity.pkl.gz', 'rb') as f:
                 similarity = pickle.load(f)
         elif os.path.exists('similarity.pkl'):
-            similarity = pickle.load(open('similarity.pkl','rb'))
-        else:
-            similarity = None
+            similarity = pickle.load(open('similarity.pkl', 'rb'))
             
         movies = pd.DataFrame(movies_dict)
         movies['year_int'] = pd.to_datetime(movies['release_date'], errors='coerce').dt.year.fillna(0).astype(int)
