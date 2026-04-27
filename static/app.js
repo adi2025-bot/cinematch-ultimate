@@ -1337,14 +1337,14 @@ function closeVoiceSearch() {
 }
 
 function cleanVoiceQuery(query) {
-    // Advanced NLP cleaner to remove conversational fluff
-    const fluffRegex = /^(i want to watch|show me|give me|can you show|find me|suggest me|suggest|batao|play|some|movies|movie|a|the|please)\b/gi;
+    // Advanced NLP cleaner to remove conversational fluff including actor/director prefixes
+    const fluffRegex = /^(i want to watch|show me|give me|can you show|find me|suggest me|suggest|batao|play|some|movies|movie|a|an|the|please|directed by|starring|actor|director|by|of)\b/gi;
     let cleaned = query.replace(fluffRegex, '').trim();
     // Run twice for cases like "show me some movies"
     cleaned = cleaned.replace(fluffRegex, '').trim();
     // Remove trailing "movies" or "movie"
     cleaned = cleaned.replace(/\s*movies?$/i, '').trim();
-    // If they just said "movies", fallback to original so search isn't completely empty
+    // Fallback to original if stripped empty
     return cleaned || query;
 }
 
@@ -1353,6 +1353,12 @@ function processVoiceQuery(query, targetInputId = 'searchInput') {
     S.isVoiceSearch = true; // Flag for TTS playback
     
     const cleanQuery = cleanVoiceQuery(query);
+    
+    // Adult intent detection -> route to age verification flow
+    if (cleanQuery.toLowerCase() === 'adult' || cleanQuery.toLowerCase() === '18+' || cleanQuery.toLowerCase() === 'adult movies') {
+        filterByGenre('Adult');
+        return;
+    }
     const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
     if (searchInput) {
         searchInput.value = cleanQuery;
