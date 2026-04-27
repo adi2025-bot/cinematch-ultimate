@@ -1310,59 +1310,152 @@ async function adminResetPassword() {
     history.pushState(null, '', '');
 })();
 
-// ===== VOICE SEARCH =====
+// ===== FULL-SCREEN VOICE SEARCH =====
+let voiceRecognition = null;
+
+function closeVoiceSearch() {
+    const modal = document.getElementById('voiceSearchModal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => modal.remove(), 300);
+    }
+    if (voiceRecognition) {
+        try { voiceRecognition.stop(); } catch(e) {}
+    }
+}
+
+function processVoiceQuery(query) {
+    closeVoiceSearch();
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.value = query;
+        S.searchQuery = query;
+        const searchBtn = document.getElementById('searchBtn');
+        if (searchBtn) {
+            searchBtn.click();
+        } else if (S.page === 'search') {
+            loadSearch(1);
+        } else {
+            navigate('search');
+        }
+    }
+}
+
 function startVoiceSearch() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         toast('Voice search is not supported in this browser.', 'error');
         return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    
+    // Create and inject modal
+    let modal = document.getElementById('voiceSearchModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'voiceSearchModal';
+    modal.className = 'voice-modal';
+    modal.innerHTML = `
+        <div class="voice-header">
+            <div class="voice-title">What are you in the mood for?</div>
+            <div class="voice-subtitle">Tap a suggestion, use your mic, or type to explore.</div>
+            
+            <div class="voice-chips">
+                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies')">Stress-buster comedies</div>
+                <div class="voice-chip" onclick="processVoiceQuery('South blockbusters in Hindi')">South blockbusters in Hindi</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Movies like Avengers')">Movies like Avengers</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family')">Movies to watch with family</div>
+            </div>
+        </div>
+        
+        <div class="voice-bottom">
+            <div class="voice-status" id="voiceStatusText">Initializing...</div>
+            <button class="voice-huge-btn listening" id="voiceHugeBtn">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+            </button>
+            <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: -10px;">Tap to talk</div>
+            
+            <div class="voice-controls">
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('searchInput').focus();">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+                </button>
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch()">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="white"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Force reflow for transition
+    void modal.offsetWidth;
+    modal.classList.add('active');
 
-    const btns = document.querySelectorAll('.voice-btn');
-    btns.forEach(b => b.classList.add('recording'));
+    const statusText = document.getElementById('voiceStatusText');
+    const hugeBtn = document.getElementById('voiceHugeBtn');
 
-    recognition.onstart = function() {
-        toast('Listening...', 'info');
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.lang = 'en-US';
+    voiceRecognition.interimResults = true;
+    voiceRecognition.maxAlternatives = 1;
+
+    voiceRecognition.onstart = function() {
+        statusText.innerText = "Listening...";
+        statusText.classList.remove('recognized');
+        hugeBtn.classList.add('listening');
     };
 
-    recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript;
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.value = transcript;
-            S.searchQuery = transcript;
-            toast(`Heard: "${transcript}"`);
-            
-            // Trigger search
-            const searchBtn = document.getElementById('searchBtn');
-            if (searchBtn) {
-                searchBtn.click();
-            } else if (S.page === 'search') {
-                loadSearch(1);
+    let finalTranscript = '';
+    
+    voiceRecognition.onresult = function(event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
             } else {
-                navigate('search');
+                interimTranscript += event.results[i][0].transcript;
             }
         }
-    };
-
-    recognition.onerror = function(event) {
-        if (event.error !== 'no-speech') {
-            toast('Voice search error: ' + event.error, 'error');
+        
+        statusText.innerText = finalTranscript || interimTranscript;
+        statusText.classList.add('recognized');
+        
+        if (finalTranscript) {
+            setTimeout(() => {
+                processVoiceQuery(finalTranscript);
+            }, 800); // Small delay to let user read what was recognized
         }
     };
 
-    recognition.onend = function() {
-        btns.forEach(b => b.classList.remove('recording'));
+    voiceRecognition.onerror = function(event) {
+        if (event.error !== 'no-speech') {
+            statusText.innerText = 'Error: ' + event.error;
+            hugeBtn.classList.remove('listening');
+        } else {
+            statusText.innerText = '';
+            hugeBtn.classList.remove('listening');
+        }
+    };
+
+    voiceRecognition.onend = function() {
+        hugeBtn.classList.remove('listening');
+        if (!finalTranscript && modal.classList.contains('active')) {
+            statusText.innerText = 'Didn\'t hear anything. Try again.';
+        }
+    };
+
+    hugeBtn.onclick = () => {
+        if (hugeBtn.classList.contains('listening')) {
+            voiceRecognition.stop();
+        } else {
+            try { voiceRecognition.start(); } catch(e) {}
+        }
     };
 
     try {
-        recognition.start();
+        voiceRecognition.start();
     } catch (e) {
-        btns.forEach(b => b.classList.remove('recording'));
+        console.error("Speech recognition start failed", e);
     }
 }
 
