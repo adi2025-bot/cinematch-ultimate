@@ -1440,8 +1440,6 @@ function startVoiceSearch(targetInputId = 'searchInput') {
             </div>
             
             <div class="voice-chips-grid">
-                <div class="voice-chip" onclick="processVoiceQuery('Movies', '${targetInputId}')"><span class="chip-emoji">🍿</span> Movies</div>
-                <div class="voice-chip" onclick="processVoiceQuery('TV Shows', '${targetInputId}')"><span class="chip-emoji">📺</span> TV Shows</div>
                 <div class="voice-chip" onclick="processVoiceQuery('Comedy', '${targetInputId}')"><span class="chip-emoji">😂</span> Comedy</div>
                 <div class="voice-chip" onclick="processVoiceQuery('Action', '${targetInputId}')"><span class="chip-emoji">🚀</span> Action</div>
                 <div class="voice-chip" onclick="processVoiceQuery('Romance', '${targetInputId}')"><span class="chip-emoji">❤️</span> Romance</div>
