@@ -1368,11 +1368,28 @@ function processVoiceQuery(query, targetInputId = 'searchInput') {
     
     const cleanQuery = cleanVoiceQuery(query);
     
+    // Genre chip detection — route directly to genre filter
+    const genreMap = {
+        'comedy': 'Comedy', 'action': 'Action', 'romance': 'Romance',
+        'thriller': 'Thriller', 'fantasy': 'Fantasy', 'sci-fi': 'Science Fiction',
+        'horror': 'Horror', 'drama': 'Drama', 'animation': 'Animation',
+        'adventure': 'Adventure', 'crime': 'Crime', 'mystery': 'Mystery',
+        'movies': '', 'tv shows': '', 'documentary': 'Documentary',
+    };
+    const lower = cleanQuery.toLowerCase();
+    
     // Adult intent detection -> route to age verification flow
-    if (cleanQuery.toLowerCase() === 'adult' || cleanQuery.toLowerCase() === '18+' || cleanQuery.toLowerCase() === 'adult movies') {
+    if (lower === 'adult' || lower === '18+' || lower === 'adult movies') {
         filterByGenre('Adult');
         return;
     }
+    
+    // Check if it's a genre keyword
+    if (genreMap[lower] !== undefined && genreMap[lower] !== '') {
+        filterByGenre(genreMap[lower]);
+        return;
+    }
+    
     const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
     if (searchInput) {
         searchInput.value = cleanQuery;
@@ -1411,30 +1428,46 @@ function startVoiceSearch(targetInputId = 'searchInput') {
     modal.id = 'voiceSearchModal';
     modal.className = 'voice-modal';
     modal.innerHTML = `
-        <div class="voice-header">
-            <div class="voice-title">What are you in the mood for?</div>
-            <div class="voice-subtitle">Tap a suggestion, use your mic, or type to explore.</div>
-            
-            <div class="voice-chips">
-                <div class="voice-chip" onclick="processVoiceQuery('Award winning movies', '${targetInputId}')">Award winning movies</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Stress-buster comedies', '${targetInputId}')">Stress-buster comedies</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Bacchon ke liye movies batao', '${targetInputId}')">Bacchon ke liye movies batao</div>
-                <div class="voice-chip" onclick="processVoiceQuery('Movies to watch with family', '${targetInputId}')">Movies to watch with family</div>
-            </div>
-        </div>
+        <button class="voice-close-btn" onclick="closeVoiceSearch()" aria-label="Close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
         
-        <div class="voice-bottom">
-            <div class="voice-status" id="voiceStatusText">Initializing...</div>
-            <button class="voice-huge-btn listening" id="voiceHugeBtn">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
-            </button>
-            <div style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: -10px;">Tap to talk</div>
+        <div class="voice-content">
+            <div class="voice-sparkle">✨</div>
+            
+            <div class="voice-header">
+                <div class="voice-title">What are you in<br>the mood for?</div>
+            </div>
+            
+            <div class="voice-chips-grid">
+                <div class="voice-chip" onclick="processVoiceQuery('Movies', '${targetInputId}')"><span class="chip-emoji">🍿</span> Movies</div>
+                <div class="voice-chip" onclick="processVoiceQuery('TV Shows', '${targetInputId}')"><span class="chip-emoji">📺</span> TV Shows</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Comedy', '${targetInputId}')"><span class="chip-emoji">😂</span> Comedy</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Action', '${targetInputId}')"><span class="chip-emoji">🚀</span> Action</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Romance', '${targetInputId}')"><span class="chip-emoji">❤️</span> Romance</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Thriller', '${targetInputId}')"><span class="chip-emoji">🕵️</span> Thriller</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Fantasy', '${targetInputId}')"><span class="chip-emoji">🧜</span> Fantasy</div>
+                <div class="voice-chip" onclick="processVoiceQuery('Sci-Fi', '${targetInputId}')"><span class="chip-emoji">🚀</span> Sci-Fi</div>
+            </div>
+            
+            <div class="voice-mic-area" id="voiceMicArea">
+                <div class="voice-glow"></div>
+                <div class="voice-glow-2"></div>
+                <div class="voice-glow-floor"></div>
+                
+                <button class="voice-huge-btn listening" id="voiceHugeBtn" aria-label="Voice Search">
+                    <svg viewBox="0 0 24 24" fill="white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+                </button>
+                
+                <div class="voice-tap-label" id="voiceTapLabel">Tap to talk</div>
+                <div class="voice-status" id="voiceStatusText"></div>
+            </div>
             
             <div class="voice-controls">
-                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('${targetInputId}').focus();">
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch(); document.getElementById('${targetInputId}').focus();" title="Keyboard">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
                 </button>
-                <button class="voice-ctrl-btn" onclick="closeVoiceSearch()">
+                <button class="voice-ctrl-btn" onclick="closeVoiceSearch()" title="Close">
                     <svg viewBox="0 0 24 24" width="28" height="28" fill="white"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                 </button>
             </div>
@@ -1448,6 +1481,8 @@ function startVoiceSearch(targetInputId = 'searchInput') {
 
     const statusText = document.getElementById('voiceStatusText');
     const hugeBtn = document.getElementById('voiceHugeBtn');
+    const micArea = document.getElementById('voiceMicArea');
+    const tapLabel = document.getElementById('voiceTapLabel');
 
     voiceRecognition = new SpeechRecognition();
     voiceRecognition.lang = 'en-US';
@@ -1458,6 +1493,9 @@ function startVoiceSearch(targetInputId = 'searchInput') {
         statusText.innerText = "Listening...";
         statusText.classList.remove('recognized');
         hugeBtn.classList.add('listening');
+        micArea.classList.add('is-listening');
+        tapLabel.textContent = 'Listening...';
+        tapLabel.style.color = 'rgba(139,92,246,0.8)';
     };
 
     let finalTranscript = '';
@@ -1474,6 +1512,7 @@ function startVoiceSearch(targetInputId = 'searchInput') {
         
         statusText.innerText = finalTranscript || interimTranscript;
         statusText.classList.add('recognized');
+        tapLabel.textContent = '';
         
         if (finalTranscript) {
             setTimeout(() => {
@@ -1486,16 +1525,25 @@ function startVoiceSearch(targetInputId = 'searchInput') {
         if (event.error !== 'no-speech') {
             statusText.innerText = 'Error: ' + event.error;
             hugeBtn.classList.remove('listening');
+            micArea.classList.remove('is-listening');
+            tapLabel.textContent = 'Tap to try again';
+            tapLabel.style.color = '';
         } else {
             statusText.innerText = '';
             hugeBtn.classList.remove('listening');
+            micArea.classList.remove('is-listening');
+            tapLabel.textContent = 'Tap to talk';
+            tapLabel.style.color = '';
         }
     };
 
     voiceRecognition.onend = function() {
         hugeBtn.classList.remove('listening');
+        micArea.classList.remove('is-listening');
         if (!finalTranscript && modal.classList.contains('active')) {
             statusText.innerText = 'Didn\'t hear anything. Try again.';
+            tapLabel.textContent = 'Tap to talk';
+            tapLabel.style.color = '';
         }
     };
 
@@ -1503,6 +1551,8 @@ function startVoiceSearch(targetInputId = 'searchInput') {
         if (hugeBtn.classList.contains('listening')) {
             voiceRecognition.stop();
         } else {
+            finalTranscript = '';
+            statusText.innerText = '';
             try { voiceRecognition.start(); } catch(e) {}
         }
     };
