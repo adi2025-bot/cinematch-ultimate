@@ -535,6 +535,61 @@ def api_genres():
     return jsonify(genre_list)
 
 # ==========================================
+# NLP API
+# ==========================================
+import re
+def parse_voice_intent(query):
+    query = query.lower().strip()
+    if re.search(r'\b(adult|18\+|porn|sexy|hot)\b', query):
+        return {'action': 'filter', 'genre': 'Adult'}
+    genres = {
+        'Comedy': ['comedy', 'funny', 'hasne wali', 'mazakiya', 'hansne', 'komedy', 'majak'],
+        'Action': ['action', 'maar dhaad', 'mar dhar', 'fighting', 'ladai', 'maar dhad'],
+        'Romance': ['romance', 'romantic', 'love story', 'pyaar wali', 'pyar wali', 'love'],
+        'Thriller': ['thriller', 'suspense', 'mystery', 'rahasya'],
+        'Horror': ['horror', 'scary', 'bhoot wali', 'bhootiya', 'daravani', 'darawni', 'bhoot'],
+        'Sci-Fi': ['sci-fi', 'science fiction', 'space', 'alien', 'sci fi'],
+        'Bollywood': ['bollywood', 'hindi', 'indian', 'desi'],
+        'Animation': ['animation', 'cartoon', 'animated'],
+    }
+    found_genre = None
+    for genre, keywords in genres.items():
+        if any(re.search(r'\b' + kw + r'\b', query) for kw in keywords):
+            found_genre = genre
+            break
+    fluff_pattern = r'\b(i want to watch|can you show me|show me|find me|suggest me|suggest|play|some|movies?|picture|filmein|film|koi|batao|dikhao|lagao|chalao|a|an|the|please|directed by|starring|actor|director|by|of|mujhe|wali|ka|ki|ke|naam|acchi|best|top|dikhana|kuch|achhi|achha|dekna|hai|dekhni|sunao|gaana|gana|song|music|sunna|bhai|yaar|yar|laga|do|de|mast|si|ek|meri|pasand|wala|karo)\b'
+    cleaned = re.sub(fluff_pattern, '', query).strip()
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    if re.search(r'\b(song|gana|gaana|music|sunao|sunna)\b', query):
+        q = cleaned if cleaned else re.sub(r'\b(song|gana|gaana|music)\b', '', query).strip()
+        return {'action': 'search', 'type': 'song', 'query': q}
+    if re.search(r'\b(actor|actress|hero|heroine|starring|ki filmein|ke movies)\b', query):
+        q = cleaned if cleaned else re.sub(r'\b(actor|actress)\b', '', query).strip()
+        return {'action': 'search', 'type': 'actor', 'query': q}
+    if re.search(r'\b(director|directed by|directed)\b', query):
+        return {'action': 'search', 'type': 'director', 'query': cleaned}
+        
+    if found_genre:
+        is_only_genre = True
+        all_kws = sum(genres.values(), [])
+        for w in cleaned.split():
+            if not any(w in kw for kw in all_kws):
+                is_only_genre = False
+                break
+        if is_only_genre or not cleaned:
+            return {'action': 'filter', 'genre': found_genre}
+            
+    if not cleaned:
+        return {'action': 'none'}
+    return {'action': 'search', 'type': 'movie', 'query': cleaned}
+
+@app.route('/api/nlp/intent')
+def api_nlp_intent():
+    q = request.args.get('q', '')
+    if not q: return jsonify({'action': 'none'})
+    return jsonify(parse_voice_intent(q))
+
+# ==========================================
 # USER ACTIONS API
 # ==========================================
 @app.route('/api/watchlist', methods=['GET', 'POST'])

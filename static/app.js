@@ -1344,112 +1344,46 @@ function closeVoiceSearch() {
     }
 }
 
-function cleanVoiceQuery(query) {
-    let cleaned = query.toLowerCase().trim();
-    const fluff = ['i want to watch', 'can you show me', 'can you show', 'show me', 'give me', 'find me', 'suggest me', 'suggest', 'batao', 'play', 'some', 'movies', 'movie', 'a', 'an', 'the', 'please', 'directed by', 'starring', 'actor', 'director', 'by', 'of'];
-    
-    // Sort by length descending so "can you show me" runs before "show me"
-    fluff.sort((a, b) => b.length - a.length);
-    
-    let changed = true;
-    while(changed) {
-        changed = false;
-        for (let word of fluff) {
-            if (cleaned.startsWith(word + ' ')) {
-                cleaned = cleaned.substring(word.length).trim();
-                changed = true;
-            } else if (cleaned === word) {
-                cleaned = "";
-                changed = true;
-            }
-        }
-    }
-    // Remove trailing "movies" or "movie"
-    cleaned = cleaned.replace(/\s*movies?$/i, '').trim();
-    
-    return cleaned || query;
-}
-
-function processVoiceQuery(query, targetInputId = 'searchInput') {
+async function processVoiceQuery(query, targetInputId = 'searchInput') {
     closeVoiceSearch();
     S.isVoiceSearch = true; // Flag for TTS playback
     
-    const lowerQuery = query.toLowerCase().trim();
-    
-    // Check for actor intent
-    if (lowerQuery.startsWith('actor ')) {
-        const actorName = lowerQuery.substring(6).trim();
-        if (actorName) {
-            S.searchType = 'actor';
-            const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
-            if (searchInput) searchInput.value = actorName;
-            S.searchQuery = actorName;
-            navigate('search');
-            return;
-        }
-    }
-    
-    // Check for song intent
-    if (lowerQuery.startsWith('song ')) {
-        const songName = lowerQuery.substring(5).trim();
-        if (songName) {
-            toast('Searching for movie...', 'success');
-            api(`movies/by-song?q=${encodeURIComponent(songName)}`).then(res => {
-                if (res.success && res.movie) {
-                    toast(`Found movie: ${res.movie.title}`, 'success');
-                    openMovie(res.movie.id);
-                } else {
-                    toast('Could not find a movie for this song.', 'error');
-                }
-            });
-            return;
-        }
-    }
-    
-    const cleanQuery = cleanVoiceQuery(query);
-    
-    // Genre chip detection — route directly to genre filter
-    const genreMap = {
-        'comedy': 'Comedy', 'action': 'Action', 'romance': 'Romance',
-        'thriller': 'Thriller', 'fantasy': 'Fantasy', 'sci-fi': 'Science Fiction',
-        'horror': 'Horror', 'drama': 'Drama', 'animation': 'Animation',
-        'adventure': 'Adventure', 'crime': 'Crime', 'mystery': 'Mystery',
-        'movies': '', 'tv shows': '', 'documentary': 'Documentary',
-    };
-    const lower = cleanQuery.toLowerCase();
-    
-    // Adult intent detection -> route to age verification flow
-    if (lower === 'adult' || lower === '18+' || lower === 'adult movies') {
-        filterByGenre('Adult');
-        return;
-    }
-    
-    // Check if it's a genre keyword
-    if (genreMap[lower] !== undefined && genreMap[lower] !== '') {
-        filterByGenre(genreMap[lower]);
-        return;
-    }
-    
-    const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.value = cleanQuery;
-        S.searchQuery = cleanQuery;
+    try {
+        const res = await api(`nlp/intent?q=${encodeURIComponent(query)}`);
         
-        if (targetInputId === 'adultSpecificSearch') {
-            const adultSearchBtn = document.getElementById('adultSearchBtn');
-            if (adultSearchBtn) adultSearchBtn.click();
-            else { S.searchPage = 1; loadSearch(1); }
+        if (res.action === 'filter') {
+            filterByGenre(res.genre);
             return;
         }
+        
+        if (res.action === 'search') {
+            // Map song to movie so the backend fallback kicks in
+            S.searchType = res.type === 'song' ? 'movie' : res.type;
+            
+            const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
+            if (searchInput) searchInput.value = res.query;
+            S.searchQuery = res.query;
+            
+            if (targetInputId === 'adultSpecificSearch') {
+                const adultSearchBtn = document.getElementById('adultSearchBtn');
+                if (adultSearchBtn) adultSearchBtn.click();
+                else { S.searchPage = 1; loadSearch(1); }
+                return;
+            }
 
-        const searchBtn = document.getElementById('searchBtn');
-        if (searchBtn) {
-            searchBtn.click();
-        } else if (S.page === 'search') {
-            loadSearch(1);
+            const searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) {
+                searchBtn.click();
+            } else if (S.page === 'search') {
+                loadSearch(1);
+            } else {
+                navigate('search');
+            }
         } else {
-            navigate('search');
+            toast("Couldn't understand. Try typing instead.", "error");
         }
+    } catch (err) {
+        toast("Voice processing failed.", "error");
     }
 }
 
