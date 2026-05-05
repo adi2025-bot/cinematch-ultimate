@@ -433,13 +433,45 @@ def api_search():
             except Exception as se:
                 print(f"Song fallback error: {se}")
                 
+            # Final Fallback: Fuzzy matching for movie titles
+            import difflib
+            lower_titles = search_df['title'].dropna().str.lower().tolist()
+            fuzzy = difflib.get_close_matches(q.lower(), lower_titles, n=5, cutoff=0.6)
+            if fuzzy:
+                fuzzy_exact = search_df[search_df['title'].fillna('').str.lower().isin(fuzzy)]
+                return jsonify(cards_with_posters(fuzzy_exact, 10))
+                
             return jsonify([])
         elif t == 'director':
             sub = search_df[search_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
-            return jsonify(cards_with_posters(sub, 20))
+            if not sub.empty:
+                return jsonify(cards_with_posters(sub, 20))
+                
+            import difflib
+            directors = search_df['director'].dropna().str.lower().unique().tolist()
+            fuzzy = difflib.get_close_matches(q.lower(), directors, n=2, cutoff=0.6)
+            if fuzzy:
+                sub = search_df[search_df['director'].fillna('').str.lower().isin(fuzzy)]
+                return jsonify(cards_with_posters(sub, 20))
+                
+            return jsonify([])
         elif t == 'actor':
             sub = search_df[search_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
-            return jsonify(cards_with_posters(sub, 20))
+            if not sub.empty:
+                return jsonify(cards_with_posters(sub, 20))
+                
+            import difflib
+            all_actors = set()
+            for cast_list in search_df['top_cast'].dropna():
+                if isinstance(cast_list, list):
+                    all_actors.update([str(a).lower() for a in cast_list])
+            
+            fuzzy = difflib.get_close_matches(q.lower(), list(all_actors), n=2, cutoff=0.6)
+            if fuzzy:
+                sub = search_df[search_df['top_cast'].fillna('').apply(lambda x: any(str(a).lower() in fuzzy for a in x) if isinstance(x, list) else False)]
+                return jsonify(cards_with_posters(sub, 20))
+                
+            return jsonify([])
     except Exception as e:
         print(f"Search API Error: {e}")
         return jsonify([])
