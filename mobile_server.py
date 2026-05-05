@@ -297,7 +297,8 @@ def api_detail(mid):
                 pr = t['watch/providers']['results']
                 region = 'IN' if 'IN' in pr else ('US' if 'US' in pr else None)
                 if region and 'flatrate' in pr.get(region, {}):
-                    detail['providers'] = [{'name': p['provider_name'], 'logo': "https://image.tmdb.org/t/p/original" + p['logo_path']} for p in pr[region]['flatrate'] if p.get('logo_path')]
+                    tmdb_link = pr[region].get('link', '')
+                    detail['providers'] = [{'name': p['provider_name'], 'logo': "https://image.tmdb.org/t/p/original" + p['logo_path'], 'url': tmdb_link} for p in pr[region]['flatrate'] if p.get('logo_path')]
             if 'release_dates' in t:
                 cert = extract_cert(t['release_dates'])
                 if cert:
@@ -597,115 +598,238 @@ def api_ml_sd():
         return jsonify({})
 
 # ==========================================
-# SONGS API (JioSaavn)
+# SONGS API (JioSaavn) — Album-based Lookup
 # ==========================================
-SAAVN_BASE = "https://saavn.sumit.co/api"
+SAAVN_INSTANCES = [
+    "https://jiosaavnapi-six.vercel.app/api",
+    "https://saavn.sumit.co/api",
+]
 songs_cache = {}
+
+def _saavn_get(path, params, timeout=10):
+    """Try multiple JioSaavn API instances, return first successful JSON response."""
+    for base in SAAVN_INSTANCES:
+        try:
+            r = tmdb_session.get(f"{base}/{path}", params=params, timeout=timeout)
+            if r.status_code == 200:
+                data = r.json()
+                return data
+        except Exception:
+            continue
+    return None
+
+def _extract_song(s):
+    """Extract a clean song dict from a JioSaavn song object."""
+    # Best quality image (500x500)
+    image = ''
+    if s.get('image'):
+        for img in s['image']:
+            if img.get('quality') == '500x500':
+                image = img['url']
+                break
+        if not image and s['image']:
+            image = s['image'][-1].get('url', '')
+
+    # 160kbps streaming URL (good quality, low bandwidth)
+    audio_url = ''
+    if s.get('downloadUrl'):
+        for dl in s['downloadUrl']:
+            if dl.get('quality') == '160kbps':
+                audio_url = dl['url']
+                break
+        if not audio_url and s['downloadUrl']:
+            audio_url = s['downloadUrl'][-1].get('url', '')
+
+    # Primary artist names
+    artists = []
+    if isinstance(s.get('artists'), dict) and s['artists'].get('primary'):
+        artists = [a['name'] for a in s['artists']['primary'][:3]]
+    elif isinstance(s.get('artists'), dict) and s['artists'].get('all'):
+        artists = [a['name'] for a in s['artists']['all'][:3]]
+    elif isinstance(s.get('primaryArtists'), str) and s['primaryArtists']:
+        artists = [a.strip() for a in s['primaryArtists'].split(',')[:3]]
+
+    return {
+        'id': s.get('id', ''),
+        'name': s.get('name', 'Unknown'),
+        'artist': ', '.join(artists) if artists else 'Unknown',
+        'album': s.get('album', {}).get('name', '') if isinstance(s.get('album'), dict) else str(s.get('album', '')),
+        'image': image,
+        'duration': int(s.get('duration', 0)),
+        'url': audio_url,
+        'year': s.get('year', ''),
+        'language': s.get('language', ''),
+        'playCount': s.get('playCount', 0),
+    }
+
+
+def _score_album(album, q_clean, movie_year):
+    """Score how well an album matches the movie. Higher = better."""
+    import re
+    name = album.get('name', '') or album.get('title', '') or ''
+    name_clean = re.sub(r'[^a-z0-9]', '', name.lower())
+    score = 0
+
+    # Exact match is best
+    if name_clean == q_clean:
+        score += 100
+    elif q_clean in name_clean:
+        score += 60
+    elif name_clean in q_clean:
+        score += 40
+    else:
+        return -1  # No match at all
+
+    # Year proximity bonus
+    album_year = 0
+    if str(album.get('year', '')).isdigit():
+        album_year = int(album['year'])
+    if movie_year > 0 and album_year > 0:
+        diff = abs(album_year - movie_year)
+        if diff == 0:
+            score += 50
+        elif diff == 1:
+            score += 30
+        elif diff == 2:
+            score += 10
+        elif diff > 5:
+            score -= 30
+
+    # Song count bonus — real movie albums usually have 4+ songs
+    song_count = album.get('songCount', 0)
+    if isinstance(song_count, str) and song_count.isdigit():
+        song_count = int(song_count)
+    if song_count and song_count >= 4:
+        score += 20
+    elif song_count and song_count >= 2:
+        score += 10
+
+    # Language bonus — prefer Hindi for Bollywood
+    lang = str(album.get('language', '')).lower()
+    if lang in ('hindi', 'telugu', 'tamil', 'kannada', 'malayalam', 'bengali', 'punjabi', 'marathi'):
+        score += 5
+
+    return score
+
 
 @app.route('/api/songs/search')
 def api_songs_search():
-    """Search songs by movie name using JioSaavn API."""
+    """Search songs by movie name — uses album-based lookup for accuracy.
+    
+    Strategy:
+    1. Search for albums matching the movie title
+    2. Pick the best-matching album (by title + year)
+    3. Fetch all songs from that album
+    This ensures we return the actual movie soundtrack, not random songs.
+    """
     q = request.args.get('q', '').strip()
     if not q:
         return jsonify([])
-    
+
     # Check cache
-    cache_key = q.lower()
+    year_str = request.args.get('year', '')
+    cache_key = f"{q.lower()}|{year_str}"
     if cache_key in songs_cache:
         return jsonify(songs_cache[cache_key])
-    
+
     try:
         import re
         q_clean = re.sub(r'[^a-z0-9]', '', q.lower())
-        
-        # Add "songs" to query for better movie soundtrack results
-        search_query = f"{q} songs"
-        r = tmdb_session.get(
-            f"{SAAVN_BASE}/search/songs",
-            params={'query': search_query, 'limit': 30},
-            timeout=10
-        )
-        if r.status_code != 200:
-            return jsonify([])
-        
-        data = r.json()
-        if not data.get('success') or not data.get('data', {}).get('results'):
-            return jsonify([])
-        
-        year_str = request.args.get('year', '')
         movie_year = int(year_str) if year_str.isdigit() else 0
-        
-        results_list = data.get('data', {}).get('results', [])
-        
-        # Count frequency of each album ID to identify official soundtracks
-        album_counts = {}
-        for s in results_list:
-            aid = str(s.get('album', {}).get('id', ''))
-            if aid:
-                album_counts[aid] = album_counts.get(aid, 0) + 1
-                
+
+        # ── STEP 1: Search for albums matching the movie name ──
+        album_data = _saavn_get('search/albums', {'query': q, 'limit': 15})
+
+        best_album_id = None
+        best_score = -1
+
+        if album_data:
+            albums = []
+            if album_data.get('success') and album_data.get('data', {}).get('results'):
+                albums = album_data['data']['results']
+            elif album_data.get('data') and isinstance(album_data['data'], list):
+                albums = album_data['data']
+            elif isinstance(album_data.get('results'), list):
+                albums = album_data['results']
+
+            for alb in albums:
+                score = _score_album(alb, q_clean, movie_year)
+                if score > best_score:
+                    best_score = score
+                    best_album_id = alb.get('id')
+
+        # ── STEP 2: Fetch all songs from the best matching album ──
         songs = []
-        for s in results_list:
-            album_name = s.get('album', {}).get('name', '')
-            album_clean = re.sub(r'[^a-z0-9]', '', album_name.lower())
-            song_name = s.get('name', '')
-            song_clean = re.sub(r'[^a-z0-9]', '', song_name.lower())
-            
-            # 1. Must loosely match the album name
-            if not album_clean or (q_clean not in album_clean and album_clean not in q_clean):
-                continue
-                
-            # 2. Check if it's a suspicious single
-            aid = str(s.get('album', {}).get('id', ''))
-            is_soundtrack = album_counts.get(aid, 0) >= 2
-            is_suspicious_single = (song_clean == q_clean) and not is_soundtrack
-            
-            if is_suspicious_single:
-                song_year = int(s.get('year', 0)) if str(s.get('year', '')).isdigit() else 0
-                if movie_year > 0 and song_year > 0:
-                    if abs(song_year - movie_year) > 2:
-                        continue
-                else:
-                    continue
-                    
-            # Get best quality image (500x500)
-            image = ''
-            if s.get('image'):
-                for img in s['image']:
-                    if img.get('quality') == '500x500':
-                        image = img['url']
-                        break
-                if not image and s['image']:
-                    image = s['image'][-1].get('url', '')
-            
-            # Get 160kbps streaming URL (good quality, low bandwidth)
-            audio_url = ''
-            if s.get('downloadUrl'):
-                for dl in s['downloadUrl']:
-                    if dl.get('quality') == '160kbps':
-                        audio_url = dl['url']
-                        break
-                if not audio_url and s['downloadUrl']:
-                    audio_url = s['downloadUrl'][-1].get('url', '')
-            
-            # Get primary artist names
-            artists = []
-            if s.get('artists', {}).get('primary'):
-                artists = [a['name'] for a in s['artists']['primary'][:3]]
-            
-            songs.append({
-                'id': s.get('id', ''),
-                'name': s.get('name', 'Unknown'),
-                'artist': ', '.join(artists) if artists else 'Unknown',
-                'album': s.get('album', {}).get('name', ''),
-                'image': image,
-                'duration': s.get('duration', 0),
-                'url': audio_url,
-                'year': s.get('year', ''),
-                'language': s.get('language', ''),
-                'playCount': s.get('playCount', 0),
-            })
-        
+
+        if best_album_id and best_score >= 40:
+            detail = _saavn_get('albums', {'id': best_album_id})
+            if detail:
+                song_list = []
+                if detail.get('success') and detail.get('data', {}).get('songs'):
+                    song_list = detail['data']['songs']
+                elif detail.get('data') and isinstance(detail['data'], list):
+                    song_list = detail['data']
+                elif detail.get('songs'):
+                    song_list = detail['songs']
+
+                for s in song_list:
+                    song = _extract_song(s)
+                    if song['url']:  # Only include playable songs
+                        songs.append(song)
+
+        # ── STEP 3: Fallback — song search if album approach found nothing ──
+        if not songs:
+            search_query = f"{q} songs"
+            data = _saavn_get('search/songs', {'query': search_query, 'limit': 25})
+            if data:
+                results_list = []
+                if data.get('success') and data.get('data', {}).get('results'):
+                    results_list = data['data']['results']
+                elif isinstance(data.get('results'), list):
+                    results_list = data['results']
+
+                # Group by album to prefer soundtrack albums
+                album_groups = {}
+                for s in results_list:
+                    album_name = ''
+                    if isinstance(s.get('album'), dict):
+                        album_name = s['album'].get('name', '')
+                    album_clean = re.sub(r'[^a-z0-9]', '', album_name.lower())
+                    if album_clean and (q_clean in album_clean or album_clean in q_clean):
+                        aid = str(s.get('album', {}).get('id', ''))
+                        if aid not in album_groups:
+                            album_groups[aid] = []
+                        album_groups[aid].append(s)
+
+                # Prefer the album group with most songs (likely the real soundtrack)
+                if album_groups:
+                    best_group = max(album_groups.values(), key=len)
+                    for s in best_group:
+                        song = _extract_song(s)
+                        if song['url']:
+                            songs.append(song)
+
+                # If still nothing, take individual matches loosely
+                if not songs:
+                    for s in results_list[:10]:
+                        album_name = ''
+                        if isinstance(s.get('album'), dict):
+                            album_name = s['album'].get('name', '')
+                        album_clean = re.sub(r'[^a-z0-9]', '', album_name.lower())
+                        if album_clean and (q_clean in album_clean or album_clean in q_clean):
+                            song = _extract_song(s)
+                            if song['url']:
+                                songs.append(song)
+
+        # Deduplicate by song ID
+        seen_ids = set()
+        unique_songs = []
+        for s in songs:
+            if s['id'] not in seen_ids:
+                seen_ids.add(s['id'])
+                unique_songs.append(s)
+        songs = unique_songs
+
         # Cache the result
         songs_cache[cache_key] = songs
         return jsonify(songs)

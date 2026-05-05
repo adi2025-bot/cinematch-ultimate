@@ -273,7 +273,7 @@ function detailPage() {
 
     let providersHtml = '';
     if (m.providers && m.providers.length) {
-        providersHtml = `<div class="detail-section"><div class="detail-section-title"><b>📺 Where to Watch</b></div></div><div class="provider-row">${m.providers.map(p => `<img src="${p.logo}" title="${p.name}" class="provider-logo" loading="lazy">`).join('')}</div>`;
+        providersHtml = `<div class="detail-section"><div class="detail-section-title"><b>📺 Where to Watch</b></div></div><div class="provider-row">${m.providers.map(p => `<a href="${p.url || `https://www.google.com/search?q=watch+${encodeURIComponent(m.title)}+on+${encodeURIComponent(p.name)}`}" target="_blank" style="text-decoration:none;"><img src="${p.logo}" title="${p.name}" class="provider-logo" loading="lazy" style="cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></a>`).join('')}</div>`;
     }
 
     const escTitle = m.title.replace(/'/g, "\\'");
