@@ -58,6 +58,9 @@ function navigate(page, params = {}, skipHistory = false) {
     Object.assign(S, { page, ...params });
     render();
     window.scrollTo({ top: 0, behavior: 'auto' });
+    if (page === 'graph') {
+        setTimeout(init3DGraph, 100);
+    }
 }
 
 // ===== RENDER =====
@@ -76,6 +79,7 @@ function render() {
         case 'recently': html = appShell(recentPage); break;
         case 'insights': html = appShell(insightsPage); break;
         case 'admin': html = appShell(adminPage); break;
+        case 'graph': html = graphPage(); break;
         default: html = loginPage();
     }
     app.innerHTML = html;
@@ -310,6 +314,9 @@ function detailPage() {
             <button class="action-btn" id="likeBtn" onclick="addLike('${escTitle}')">👍 Like</button>
             <button class="action-btn" id="remindBtn" onclick="remindMeLater()">🔔 Remind</button>
         </div>
+        <div style="padding: 0 20px 10px;">
+            <button class="action-btn" style="width:100%; background:var(--gradient-primary); color:white; border:none; box-shadow:0 4px 15px rgba(139,92,246,0.4);" onclick="openKnowledgeGraph('${escTitle}', 'movie')">🌌 Explore Cinematic Universe in 3D</button>
+        </div>
         <div class="detail-section"><div class="detail-section-title"><b>📤 Share</b></div></div>
         <div class="share-row">
             <a href="https://wa.me/?text=${shareText}%20${shareUrl}" target="_blank" class="share-btn share-wa"><svg viewBox="0 0 24 24" width="22" height="22" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
@@ -364,6 +371,9 @@ function actorPage() {
                     <span class="stat-pill">🎬 ${a.total_movies} films</span>
                 </div>
             </div>
+        </div>
+        <div style="padding: 0 20px;">
+            <button class="action-btn" style="width:100%; background:var(--gradient-primary); color:white; border:none; box-shadow:0 4px 15px rgba(139,92,246,0.4); margin-bottom:10px;" onclick="openKnowledgeGraph('${a.name.replace(/'/g,"\\'")}', 'actor')">🌌 Explore in 3D Universe</button>
         </div>
         <div class="detail-section"><div class="detail-section-title"><b>📖 Biography</b></div>
             <p class="overview-text" id="actorBioText">${bioShort || 'No biography available.'}</p>
@@ -1300,6 +1310,96 @@ async function adminResetPassword() {
     const res = await api('admin/reset-password', { method: 'POST', body: { username: u, new_password: p } });
     if (res.success) { toast(`Password reset for ${u}`); document.getElementById('adminNewPass').value = ''; }
     else toast(res.message, 'error');
+}
+
+// ===== 3D KNOWLEDGE GRAPH =====
+function openKnowledgeGraph(query, type) {
+    S.graphQuery = query;
+    S.graphType = type;
+    navigate('graph');
+}
+
+function graphPage() {
+    return `
+    <div id="3d-graph-container" style="position:fixed; inset:0; z-index:100000; background:#020205; overflow:hidden;">
+        <div id="3d-graph"></div>
+        <button class="btn btn-secondary" onclick="goBack()" style="position:absolute; top:20px; left:20px; z-index:100001; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px);">
+            ← Exit Universe
+        </button>
+        <div style="position:absolute; top:20px; right:20px; z-index:100001; color:white; text-align:right;">
+            <h2 style="margin:0; font-weight:800; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">${S.graphQuery}</h2>
+            <div style="font-size:0.8rem; color:var(--accent-light);">Cinematic Universe 3D</div>
+        </div>
+        <div id="graph-loading" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:100000; background:#020205; color:white; font-size:1.2rem;">
+            Initializing Universe...
+        </div>
+    </div>`;
+}
+
+async function init3DGraph() {
+    if (typeof ForceGraph3D === 'undefined' || typeof THREE === 'undefined') {
+        toast("3D Engine is still loading...", "warning");
+        setTimeout(init3DGraph, 500);
+        return;
+    }
+    
+    const container = document.getElementById('3d-graph');
+    if (!container) return;
+    
+    let data;
+    try {
+        const res = await fetch(`/api/graph?q=${encodeURIComponent(S.graphQuery)}&type=${S.graphType}`);
+        data = await res.json();
+    } catch(e) {
+        toast("Failed to load universe", "error");
+        return;
+    }
+    
+    document.getElementById('graph-loading').style.display = 'none';
+    
+    if (!data.nodes || data.nodes.length === 0) {
+        toast("No universe data found.", "error");
+        return;
+    }
+    
+    const Graph = ForceGraph3D()
+        (container)
+        .backgroundColor('#020205')
+        .nodeLabel('label')
+        .nodeColor(node => {
+            if (node.group === 1) return '#8B5CF6'; 
+            if (node.group === 2) return '#EC4899'; 
+            if (node.group === 3) return '#10B981'; 
+            if (node.group === 4) return '#3B82F6'; 
+            return '#ffffff';
+        })
+        .nodeThreeObject(node => {
+            if (node.img && node.group === 2) {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.crossOrigin = "Anonymous";
+                const imgTexture = textureLoader.load(node.img);
+                imgTexture.colorSpace = THREE.SRGBColorSpace;
+                const material = new THREE.SpriteMaterial({ map: imgTexture });
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(12, 18);
+                return sprite;
+            }
+            return false;
+        })
+        .linkDirectionalParticles(2)
+        .linkDirectionalParticleWidth(1.5)
+        .linkColor(() => 'rgba(139, 92, 246, 0.2)')
+        .onNodeClick(node => {
+            Graph.centerAt(node.x, node.y, node.z, 1000);
+            Graph.zoom(8, 2000);
+            toast(`Viewing: ${node.label}`);
+        });
+        
+    Graph.graphData(data);
+    Graph.cameraPosition({ z: 300 });
+    setTimeout(() => {
+        Graph.zoomToFit(1500, 20);
+    }, 100);
 }
 
 // ===== INIT =====

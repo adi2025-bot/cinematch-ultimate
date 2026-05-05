@@ -566,6 +566,86 @@ def api_genres():
         genre_list.append('Bollywood')
     return jsonify(genre_list)
 
+@app.route('/api/graph')
+def api_graph():
+    q = request.args.get('q', '').strip()
+    type_ = request.args.get('type', 'actor')
+    
+    nodes = []
+    links = []
+    node_ids = set()
+    
+    def add_node(id_val, group, label, img=''):
+        if id_val not in node_ids:
+            nodes.append({'id': id_val, 'group': group, 'label': label, 'img': img})
+            node_ids.add(id_val)
+            
+    if not q:
+        return jsonify({'nodes': [], 'links': []})
+        
+    if type_ == 'actor':
+        sub = movies_df[movies_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
+        if sub.empty: return jsonify({'nodes': [], 'links': []})
+        actor_name = q.title()
+        add_node(actor_name, 1, actor_name)
+        
+        for idx, row in sub.head(15).iterrows():
+            m_id = row['title']
+            poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
+            add_node(m_id, 2, m_id, poster)
+            links.append({'source': actor_name, 'target': m_id})
+            
+            d = row.get('director', '')
+            if pd.notnull(d) and d != 'Unknown':
+                add_node(d, 3, d)
+                links.append({'source': m_id, 'target': d})
+                
+            if isinstance(row.get('top_cast'), list):
+                for co in row['top_cast'][:4]:
+                    if co.lower() != q.lower():
+                        add_node(co, 4, co)
+                        links.append({'source': m_id, 'target': co})
+        return jsonify({'nodes': nodes, 'links': links})
+        
+    elif type_ == 'director':
+        sub = movies_df[movies_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
+        if sub.empty: return jsonify({'nodes': [], 'links': []})
+        dir_name = q.title()
+        add_node(dir_name, 3, dir_name)
+        
+        for idx, row in sub.head(15).iterrows():
+            m_id = row['title']
+            poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
+            add_node(m_id, 2, m_id, poster)
+            links.append({'source': dir_name, 'target': m_id})
+            
+            if isinstance(row.get('top_cast'), list):
+                for co in row['top_cast'][:4]:
+                    add_node(co, 4, co)
+                    links.append({'source': m_id, 'target': co})
+        return jsonify({'nodes': nodes, 'links': links})
+        
+    elif type_ == 'movie':
+        sub = movies_df[movies_df['title'].fillna('').str.lower() == q.lower()]
+        if sub.empty: return jsonify({'nodes': [], 'links': []})
+        row = sub.iloc[0]
+        m_id = row['title']
+        poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
+        add_node(m_id, 2, m_id, poster)
+        
+        d = row.get('director', '')
+        if pd.notnull(d) and d != 'Unknown':
+            add_node(d, 3, d)
+            links.append({'source': m_id, 'target': d})
+            
+        if isinstance(row.get('top_cast'), list):
+            for co in row['top_cast'][:6]:
+                add_node(co, 4, co)
+                links.append({'source': m_id, 'target': co})
+        return jsonify({'nodes': nodes, 'links': links})
+        
+    return jsonify({'nodes': [], 'links': []})
+
 # ==========================================
 # NLP API
 # ==========================================
