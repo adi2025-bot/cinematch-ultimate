@@ -397,7 +397,39 @@ def api_search():
                 return jsonify(cards_with_posters(exact, 1))
             
             partial = search_df[search_df['title'].fillna('').str.contains(q, case=False, regex=False)]
-            return jsonify(cards_with_posters(partial, 20))
+            if not partial.empty:
+                return jsonify(cards_with_posters(partial, 20))
+                
+            # Fallback: if no movie found, try interpreting query as a song
+            try:
+                data = _saavn_get('search/songs', {'query': q, 'limit': 1})
+                if data:
+                    song = None
+                    if data.get('success') and data.get('data', {}).get('results'):
+                        song = data['data']['results'][0]
+                    elif isinstance(data.get('results'), list) and len(data['results']) > 0:
+                        song = data['results'][0]
+                    
+                    if song:
+                        album_name = ''
+                        if isinstance(song.get('album'), dict):
+                            album_name = song['album'].get('name', '')
+                        elif isinstance(song.get('album'), str):
+                            album_name = song['album']
+                            
+                        if album_name:
+                            import re
+                            album_clean = re.sub(r'\(.*?\)', '', album_name).strip()
+                            song_exact = search_df[search_df['title'].fillna('').str.lower() == album_clean.lower()]
+                            if not song_exact.empty:
+                                return jsonify(cards_with_posters(song_exact, 1))
+                            song_partial = search_df[search_df['title'].fillna('').str.contains(album_clean, case=False, regex=False)]
+                            if not song_partial.empty:
+                                return jsonify(cards_with_posters(song_partial, 1))
+            except Exception as se:
+                print(f"Song fallback error: {se}")
+                
+            return jsonify([])
         elif t == 'director':
             sub = search_df[search_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
             return jsonify(cards_with_posters(sub, 20))
