@@ -288,6 +288,7 @@ function detailPage() {
     return `<div class="detail-page">
         <div class="detail-back"><button class="btn btn-secondary btn-sm" onclick="goBack()">← Back</button></div>
         <div class="hero-section" style="background-image:url('${backdrop}')">
+            ${m.trailer ? `<div class="hero-video-bg"><iframe src="https://www.youtube-nocookie.com/embed/${m.trailer}?autoplay=1&mute=1&controls=0&loop=1&playlist=${m.trailer}&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3" allow="autoplay; encrypted-media" tabindex="-1"></iframe></div>` : ''}
             <div class="hero-gradient">
                 <div class="hero-poster"><img src="${m.poster}" alt="${m.title}" loading="lazy"></div>
                 <div class="hero-info">

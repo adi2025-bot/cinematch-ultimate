@@ -323,9 +323,22 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
 .hero-section {
     position: relative; min-height: 300px; background-size: cover; background-position: center;
     border-radius: 0 0 24px 24px; overflow: hidden;
+    /* Force new stacking context */
+    isolation: isolate;
+}
+.hero-video-bg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 200%; height: 200%;
+    z-index: -1; pointer-events: none; opacity: 0.6;
+    display: flex; align-items: center; justify-content: center;
+}
+.hero-video-bg iframe {
+    width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.77vh;
+    border: none; pointer-events: none;
 }
 .hero-gradient {
-    background: linear-gradient(to top, var(--bg-deep) 0%, rgba(15,12,41,0.85) 40%, rgba(15,12,41,0.4) 100%);
+    position: relative; z-index: 1;
+    background: linear-gradient(to top, var(--bg-deep) 0%, rgba(15,12,41,0.95) 45%, rgba(15,12,41,0.6) 100%);
     padding: 120px 20px 24px; display: flex; gap: 16px; align-items: flex-end;
 }
 .hero-poster {
