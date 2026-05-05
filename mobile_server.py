@@ -584,7 +584,7 @@ def api_graph():
         return jsonify({'nodes': [], 'links': []})
         
     if type_ == 'actor':
-        sub = movies_df[movies_df['top_cast'].fillna('').apply(lambda x: any(q.lower() in str(a).lower() for a in x) if isinstance(x, list) else False)]
+        sub = movies_df[movies_df['top_cast'].astype(str).str.lower().str.contains(q.lower(), regex=False, na=False)]
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         actor_name = q.title()
         add_node(actor_name, 1, actor_name)
@@ -608,7 +608,7 @@ def api_graph():
         return jsonify({'nodes': nodes, 'links': links})
         
     elif type_ == 'director':
-        sub = movies_df[movies_df['director'].fillna('').apply(lambda x: q.lower() in str(x).lower())]
+        sub = movies_df[movies_df['director'].astype(str).str.lower().str.contains(q.lower(), regex=False, na=False)]
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         dir_name = q.title()
         add_node(dir_name, 3, dir_name)

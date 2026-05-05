@@ -1341,11 +1341,11 @@ async function load3DEngine() {
         if (typeof ForceGraph3D !== 'undefined' && typeof THREE !== 'undefined') return resolve();
         toast("Loading Cinematic Universe 3D...", "success");
         const s1 = document.createElement('script');
-        s1.src = "https://unpkg.com/three";
+        s1.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
         document.body.appendChild(s1);
         s1.onload = () => {
             const s2 = document.createElement('script');
-            s2.src = "https://unpkg.com/3d-force-graph";
+            s2.src = "https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js";
             document.body.appendChild(s2);
             s2.onload = resolve;
         };
