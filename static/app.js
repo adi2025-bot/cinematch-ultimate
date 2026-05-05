@@ -1366,6 +1366,38 @@ function processVoiceQuery(query, targetInputId = 'searchInput') {
     closeVoiceSearch();
     S.isVoiceSearch = true; // Flag for TTS playback
     
+    const lowerQuery = query.toLowerCase().trim();
+    
+    // Check for actor intent
+    if (lowerQuery.startsWith('actor ')) {
+        const actorName = lowerQuery.substring(6).trim();
+        if (actorName) {
+            S.searchType = 'actor';
+            const searchInput = document.getElementById(targetInputId) || document.getElementById('searchInput');
+            if (searchInput) searchInput.value = actorName;
+            S.searchQuery = actorName;
+            navigate('search');
+            return;
+        }
+    }
+    
+    // Check for song intent
+    if (lowerQuery.startsWith('song ')) {
+        const songName = lowerQuery.substring(5).trim();
+        if (songName) {
+            toast('Searching for movie...', 'success');
+            api(`movies/by-song?q=${encodeURIComponent(songName)}`).then(res => {
+                if (res.success && res.movie) {
+                    toast(`Found movie: ${res.movie.title}`, 'success');
+                    openMovie(res.movie.id);
+                } else {
+                    toast('Could not find a movie for this song.', 'error');
+                }
+            });
+            return;
+        }
+    }
+    
     const cleanQuery = cleanVoiceQuery(query);
     
     // Genre chip detection — route directly to genre filter

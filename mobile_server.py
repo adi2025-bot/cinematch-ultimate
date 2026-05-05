@@ -409,6 +409,49 @@ def api_search():
         return jsonify([])
     return jsonify([])
 
+@app.route('/api/movies/by-song')
+def api_by_song():
+    q = request.args.get('q', '').strip()
+    if not q: return jsonify({'success': False})
+    
+    data = _saavn_get('search/songs', {'query': q, 'limit': 1})
+    if not data: return jsonify({'success': False})
+    
+    try:
+        if data.get('success') and data.get('data', {}).get('results'):
+            song = data['data']['results'][0]
+        elif isinstance(data.get('results'), list) and len(data['results']) > 0:
+            song = data['results'][0]
+        else:
+            return jsonify({'success': False})
+            
+        album_name = ''
+        if isinstance(song.get('album'), dict):
+            album_name = song['album'].get('name', '')
+        elif isinstance(song.get('album'), str):
+            album_name = song['album']
+            
+        if not album_name:
+            return jsonify({'success': False})
+            
+        # Clean album name (remove (Original Motion Picture Soundtrack) etc.)
+        import re
+        album_clean = re.sub(r'\(.*?\)', '', album_name).strip()
+        
+        # Search movies_df
+        exact = movies_df[movies_df['title'].fillna('').str.lower() == album_clean.lower()]
+        if not exact.empty:
+            return jsonify({'success': True, 'movie': movie_to_card(exact.iloc[0])})
+            
+        partial = movies_df[movies_df['title'].fillna('').str.contains(album_clean, case=False, regex=False)]
+        if not partial.empty:
+            return jsonify({'success': True, 'movie': movie_to_card(partial.iloc[0])})
+            
+        return jsonify({'success': False})
+    except Exception as e:
+        print(f"By Song API Error: {e}")
+        return jsonify({'success': False})
+
 @app.route('/api/movies/filter')
 def api_filter():
     genre = request.args.get('genre', 'All')
