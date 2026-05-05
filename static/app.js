@@ -1336,10 +1336,27 @@ function graphPage() {
     </div>`;
 }
 
+async function load3DEngine() {
+    return new Promise(resolve => {
+        if (typeof ForceGraph3D !== 'undefined' && typeof THREE !== 'undefined') return resolve();
+        toast("Loading Cinematic Universe 3D...", "success");
+        const s1 = document.createElement('script');
+        s1.src = "https://unpkg.com/three";
+        document.body.appendChild(s1);
+        s1.onload = () => {
+            const s2 = document.createElement('script');
+            s2.src = "https://unpkg.com/3d-force-graph";
+            document.body.appendChild(s2);
+            s2.onload = resolve;
+        };
+    });
+}
+
 async function init3DGraph() {
+    await load3DEngine();
+    
     if (typeof ForceGraph3D === 'undefined' || typeof THREE === 'undefined') {
-        toast("3D Engine is still loading...", "warning");
-        setTimeout(init3DGraph, 500);
+        toast("3D Engine failed to load.", "error");
         return;
     }
     
