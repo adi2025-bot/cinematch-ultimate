@@ -422,10 +422,14 @@ def api_search():
                             album_clean = re.sub(r'\(.*?\)', '', album_name).strip()
                             song_exact = search_df[search_df['title'].fillna('').str.lower() == album_clean.lower()]
                             if not song_exact.empty:
-                                return jsonify(cards_with_posters(song_exact, 1))
+                                r = cards_with_posters(song_exact, 1)
+                                if r: r[0]['is_song_fallback'] = True
+                                return jsonify(r)
                             song_partial = search_df[search_df['title'].fillna('').str.contains(album_clean, case=False, regex=False)]
                             if not song_partial.empty:
-                                return jsonify(cards_with_posters(song_partial, 1))
+                                r = cards_with_posters(song_partial, 1)
+                                if r: r[0]['is_song_fallback'] = True
+                                return jsonify(r)
             except Exception as se:
                 print(f"Song fallback error: {se}")
                 

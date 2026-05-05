@@ -889,6 +889,14 @@ async function loadSearch(page = 1) {
         if (page === 1) {
             grid.innerHTML = html || emptyState('🔍', 'No results found. Try a different search.');
             
+            // Redirect automatically if it's a song fallback and we have 1 result
+            if (movies.length === 1 && movies[0].is_song_fallback) {
+                toast(`Found movie for song: ${movies[0].title}`, 'success');
+                openMovie(movies[0].id);
+                S.isVoiceSearch = false;
+                return;
+            }
+            
             // TTS Voice Feedback
             if (S.isVoiceSearch) {
                 S.isVoiceSearch = false; // Reset flag
