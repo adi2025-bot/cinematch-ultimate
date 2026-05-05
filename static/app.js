@@ -1326,10 +1326,32 @@ function graphPage() {
         <button class="btn btn-secondary" onclick="goBack()" style="position:absolute; top:20px; left:20px; z-index:100001; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px);">
             ← Exit Universe
         </button>
-        <div style="position:absolute; top:20px; right:20px; z-index:100001; color:white; text-align:right;">
+        <div style="position:absolute; bottom:30px; left:0; width:100%; text-align:center; z-index:100001; pointer-events:none;">
+            <div style="display:inline-block; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); padding:10px 24px; border-radius:30px; border:1px solid rgba(255,255,255,0.1); color:white; font-weight:500; letter-spacing:2px; font-size:0.9rem;">
+                DRAG • SPIN • CLICK
+            </div>
+        </div>
+        <div style="position:absolute; top:20px; right:20px; z-index:100001; color:white; text-align:right; pointer-events:none;">
             <h2 style="margin:0; font-weight:800; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">${S.graphQuery}</h2>
             <div style="font-size:0.8rem; color:var(--accent-light);">Cinematic Universe 3D</div>
         </div>
+        
+        <div id="graph-side-panel" class="graph-side-panel">
+            <div class="gsp-header">
+                <button class="gsp-close" onclick="document.getElementById('graph-side-panel').classList.remove('open')">✕</button>
+                <img id="gsp-img" class="gsp-avatar" src="">
+                <div>
+                    <h3 id="gsp-title" class="gsp-title">Name</h3>
+                    <div id="gsp-subtitle" class="gsp-subtitle">Role</div>
+                </div>
+            </div>
+            <div class="gsp-content">
+                <div class="detail-section-title" style="margin-bottom:12px;"><b>🔗 Local Connections</b></div>
+                <div id="gsp-connections" class="movie-grid" style="grid-template-columns: repeat(2, 1fr); padding-bottom:20px;"></div>
+                <button id="gsp-action-btn" class="btn btn-primary" style="width:100%; margin-top:auto;">View Full Profile</button>
+            </div>
+        </div>
+        
         <div id="graph-loading" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:100000; background:#020205; color:white; font-size:1.2rem;">
             Initializing Universe...
         </div>
@@ -1382,34 +1404,77 @@ async function init3DGraph() {
     const Graph = ForceGraph3D()
         (container)
         .backgroundColor('#020205')
-        .nodeLabel('label')
-        .nodeColor(node => {
-            if (node.group === 1) return '#8B5CF6'; 
-            if (node.group === 2) return '#EC4899'; 
-            if (node.group === 3) return '#10B981'; 
-            if (node.group === 4) return '#3B82F6'; 
-            return '#ffffff';
-        })
         .nodeThreeObject(node => {
-            if (node.img && node.group === 2) {
-                const textureLoader = new THREE.TextureLoader();
-                textureLoader.crossOrigin = "Anonymous";
-                const imgTexture = textureLoader.load(node.img);
-                imgTexture.colorSpace = THREE.SRGBColorSpace;
-                const material = new THREE.SpriteMaterial({ map: imgTexture });
-                const sprite = new THREE.Sprite(material);
-                sprite.scale.set(12, 18);
-                return sprite;
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 320;
+            const ctx = canvas.getContext('2d');
+            const cx = 128, cy = 128, r = 100;
+            
+            // Glow
+            ctx.shadowColor = node.group === 1 ? '#8B5CF6' : (node.group === 2 ? '#EC4899' : (node.group === 3 ? '#10B981' : '#3B82F6'));
+            ctx.shadowBlur = 25;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0a0a1a'; ctx.fill();
+            
+            // Border
+            ctx.lineWidth = 6; ctx.strokeStyle = ctx.shadowColor; ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            // Label
+            ctx.fillStyle = 'white'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(node.label.length > 20 ? node.label.substring(0,18)+'...' : node.label, cx, 270);
+            if(node.group === 1) { ctx.fillStyle = '#8B5CF6'; ctx.font = '20px sans-serif'; ctx.fillText('Center', cx, 300); }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(20, 25);
+            
+            let imgSrc = node.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(node.label)}&background=1a1a2e&color=fff&size=200&rounded=true`;
+            if (imgSrc) {
+                const img = new Image(); img.crossOrigin = "Anonymous"; img.src = imgSrc;
+                img.onload = () => {
+                    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r - 3, 0, 2 * Math.PI); ctx.clip();
+                    const scale = (r * 2) / Math.min(img.width, img.height);
+                    const w = img.width * scale, h = img.height * scale;
+                    ctx.drawImage(img, cx - w/2, cy - h/2, w, h);
+                    ctx.restore();
+                    texture.needsUpdate = true;
+                };
             }
-            return false;
+            return sprite;
         })
         .linkDirectionalParticles(2)
         .linkDirectionalParticleWidth(1.5)
         .linkColor(() => 'rgba(139, 92, 246, 0.2)')
         .onNodeClick(node => {
-            Graph.centerAt(node.x, node.y, node.z, 1000);
-            Graph.zoom(8, 2000);
-            toast(`Viewing: ${node.label}`);
+            const distRatio = 1 + 100/Math.hypot(node.x, node.y, node.z);
+            Graph.cameraPosition({ x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, node, 2000);
+            
+            const panel = document.getElementById('graph-side-panel');
+            document.getElementById('gsp-title').textContent = node.label;
+            document.getElementById('gsp-subtitle').textContent = node.group === 2 ? 'Movie' : (node.group === 3 ? 'Director' : 'Actor');
+            document.getElementById('gsp-img').src = node.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(node.label)}&background=1a1a2e&color=fff&size=200`;
+            
+            const connections = data.links.filter(l => l.source.id === node.id || l.target.id === node.id).map(l => l.source.id === node.id ? l.target : l.source);
+            document.getElementById('gsp-connections').innerHTML = connections.map(c => {
+                const cImg = c.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.label)}&background=1a1a2e&color=fff&size=200`;
+                return `<div class="movie-card" style="cursor:pointer;" onclick="document.getElementById('graph-side-panel').classList.remove('open'); setTimeout(() => openKnowledgeGraph('${c.label.replace(/'/g,"\\'")}', '${c.group === 2 ? 'movie' : 'actor'}'), 300)">
+                    <div class="movie-poster" style="height:120px;"><img src="${cImg}" style="height:100%; object-fit:cover;"></div>
+                    <div class="movie-info" style="padding:8px;"><div class="movie-title" style="font-size:0.8rem">${c.label}</div></div>
+                </div>`;
+            }).join('') || '<div style="color:#666">No local connections found.</div>';
+            
+            document.getElementById('gsp-action-btn').onclick = () => {
+                panel.classList.remove('open');
+                if (node.group === 2) {
+                    S.searchQuery = node.label; S.searchType = 'movie';
+                    const sBtn = document.getElementById('searchBtn');
+                    if (sBtn) sBtn.click(); else navigate('search');
+                } else openActorProfile(node.label, 0);
+            };
+            panel.classList.add('open');
         });
         
     Graph.graphData(data);
