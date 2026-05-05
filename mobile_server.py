@@ -596,7 +596,8 @@ def api_graph():
             links.append({'source': actor_name, 'target': m_id})
             
             d = row.get('director', '')
-            if pd.notnull(d) and d != 'Unknown':
+            if isinstance(d, list) and len(d) > 0: d = d[0]
+            if pd.notnull(d) and d != 'Unknown' and isinstance(d, str):
                 add_node(d, 3, d)
                 links.append({'source': m_id, 'target': d})
                 
@@ -626,15 +627,16 @@ def api_graph():
         return jsonify({'nodes': nodes, 'links': links})
         
     elif type_ == 'movie':
-        sub = movies_df[movies_df['title'].fillna('').str.lower() == q.lower()]
+        sub = movies_df[movies_df['title'].astype(str).str.lower() == q.lower()]
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         row = sub.iloc[0]
         m_id = row['title']
         poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
-        add_node(m_id, 2, m_id, poster)
+        add_node(m_id, 1, m_id, poster)
         
         d = row.get('director', '')
-        if pd.notnull(d) and d != 'Unknown':
+        if isinstance(d, list) and len(d) > 0: d = d[0]
+        if pd.notnull(d) and d != 'Unknown' and isinstance(d, str):
             add_node(d, 3, d)
             links.append({'source': m_id, 'target': d})
             
