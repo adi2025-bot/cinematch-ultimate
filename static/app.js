@@ -1323,19 +1323,33 @@ function graphPage() {
     const isMobile = window.innerWidth < 768;
     const hintText = isMobile ? 'DRAG • SPIN • TAP' : 'DRAG • SPIN • CLICK';
     return `
-    <div id="3d-graph-container" style="position:fixed; inset:0; z-index:100000; background:#020205; overflow:hidden; touch-action:none;">
+    <div id="3d-graph-container" style="position:fixed; inset:0; z-index:100000; background: radial-gradient(circle at center, #0B1324 0%, #070C14 100%); overflow:hidden; touch-action:none;">
+        
+        <!-- Glowing Sci-Fi Background Elements -->
+        <div style="position:absolute; top:-15%; left:-10%; width:60vw; height:60vw; background:radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%); border-radius:50%; filter:blur(50px); pointer-events:none;"></div>
+        <div style="position:absolute; bottom:-15%; right:-10%; width:70vw; height:70vw; background:radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%); border-radius:50%; filter:blur(50px); pointer-events:none;"></div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:120vw; height:120vh; background:radial-gradient(ellipse at center, rgba(16,185,129,0.03) 0%, transparent 65%); pointer-events:none;"></div>
+        <div style="position:absolute; inset:0; background-image:url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E'); opacity:0.04; pointer-events:none; mix-blend-mode:overlay;"></div>
+
         <div id="3d-graph"></div>
-        <button class="btn btn-secondary" onclick="goBack()" style="position:absolute; top:20px; left:20px; z-index:100001; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px); min-width:48px; min-height:48px;">
-            ← Exit Universe
-        </button>
-        <div style="position:absolute; bottom:30px; left:0; width:100%; text-align:center; z-index:100001; pointer-events:none;">
-            <div style="display:inline-block; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); padding:10px 24px; border-radius:30px; border:1px solid rgba(255,255,255,0.1); color:white; font-weight:500; letter-spacing:2px; font-size:0.9rem;">
-                ${hintText}
+        
+        <!-- Top Bar Layout to Prevent Collision -->
+        <div style="position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; align-items:flex-start; z-index:100001; pointer-events:none; gap:10px;">
+            <button class="btn btn-secondary" onclick="goBack()" style="pointer-events:auto; flex-shrink:0; background:rgba(11, 19, 36, 0.65); border:1px solid rgba(139,92,246,0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 12px rgba(139,92,246,0.15); backdrop-filter:blur(15px); -webkit-backdrop-filter:blur(15px); border-radius:12px; padding:10px 16px; display:flex; align-items:center; gap:6px; color:white; transition:all 0.3s ease;">
+                <span style="font-size:1.2rem; line-height:1;">←</span> 
+                <span style="font-weight:600; font-size:0.9rem; letter-spacing:0.5px;">${isMobile ? 'Exit' : 'Exit Universe'}</span>
+            </button>
+            <div style="color:white; text-align:right; flex-grow:1; min-width:0;">
+                <h2 style="margin:0; font-weight:800; text-shadow: 0 4px 20px rgba(0,0,0,0.9); font-size:${isMobile ? '1.2rem' : '1.6rem'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:linear-gradient(to right, #A78BFA, #60A5FA); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">${S.graphQuery}</h2>
+                <div style="font-size:${isMobile ? '0.65rem' : '0.8rem'}; color:rgba(255,255,255,0.7); letter-spacing:1px; text-transform:uppercase; margin-top:4px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Cinematic Universe</div>
             </div>
         </div>
-        <div style="position:absolute; top:20px; right:20px; z-index:100001; color:white; text-align:right; pointer-events:none; max-width:50vw;">
-            <h2 style="margin:0; font-weight:800; text-shadow: 0 2px 10px rgba(0,0,0,0.8); font-size:${isMobile ? '1rem' : '1.4rem'}; word-break:break-word;">${S.graphQuery}</h2>
-            <div style="font-size:0.8rem; color:var(--accent-light);">Cinematic Universe 3D</div>
+
+        <!-- Bottom Hint -->
+        <div style="position:absolute; bottom:30px; left:0; width:100%; text-align:center; z-index:100001; pointer-events:none;">
+            <div style="display:inline-block; background:rgba(7, 12, 20, 0.75); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); padding:10px 24px; border-radius:30px; border:1px solid rgba(59,130,246,0.25); box-shadow: 0 4px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(59,130,246,0.1); color:white; font-weight:600; letter-spacing:2px; font-size:0.85rem; text-transform:uppercase;">
+                ${hintText}
+            </div>
         </div>
         
         <div id="graph-side-panel" class="graph-side-panel">
@@ -1350,14 +1364,14 @@ function graphPage() {
             <div class="gsp-content">
                 <div class="detail-section-title" style="margin-bottom:12px;"><b>🔗 Local Connections</b></div>
                 <div id="gsp-connections" class="movie-grid" style="grid-template-columns: repeat(2, 1fr); padding-bottom:20px;"></div>
-                <button id="gsp-action-btn" class="btn btn-primary" style="width:100%; margin-top:auto;">View Full Profile</button>
+                <button id="gsp-action-btn" class="btn btn-primary" style="width:100%; margin-top:auto; background:linear-gradient(135deg, #3B82F6, #8B5CF6); border:none; box-shadow:0 4px 15px rgba(139,92,246,0.3);">View Full Profile</button>
             </div>
         </div>
         
-        <div id="graph-loading" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:100002; background:#020205; color:white; font-size:1.1rem; letter-spacing:1px;">
+        <div id="graph-loading" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:100002; background:radial-gradient(circle at center, #0B1324 0%, #070C14 100%); color:white; font-size:1.1rem; letter-spacing:1px;">
             <div style="text-align:center;">
-                <div style="font-size:2rem; margin-bottom:16px;">🌌</div>
-                <div>Loading Cinematic Universe...</div>
+                <div style="font-size:2.5rem; margin-bottom:16px; animation: pulse 2s infinite;">🌌</div>
+                <div style="background:linear-gradient(to right, #A78BFA, #60A5FA); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:600;">Loading Cinematic Universe...</div>
             </div>
         </div>
     </div>`;
