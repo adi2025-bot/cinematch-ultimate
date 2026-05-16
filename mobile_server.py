@@ -566,6 +566,172 @@ def api_genres():
         genre_list.append('Bollywood')
     return jsonify(genre_list)
 
+@app.route('/api/movies/random')
+def api_random():
+    """Return a random movie, optionally filtered by genre, min rating, decade."""
+    import random as _rand
+    genre = request.args.get('genre', '')
+    min_rating = float(request.args.get('min_rating', 5))
+    decade = request.args.get('decade', '')
+
+    sub = movies_df[movies_df['vote_average'] >= min_rating].copy()
+    # Exclude adult by default
+    if 'adult' in sub.columns:
+        sub = sub[sub['adult'] == False]
+    # Genre filter
+    if genre and genre not in ('All', ''):
+        if genre == 'Bollywood':
+            if 'original_language' in sub.columns:
+                sub = sub[sub['original_language'] == 'hi']
+        else:
+            sub = sub[sub['genres_list'].apply(lambda x: genre in x if isinstance(x, list) else False)]
+    # Decade filter
+    if decade:
+        try:
+            d = int(decade)
+            sub = sub[(sub['year_int'] >= d) & (sub['year_int'] < d + 10)]
+        except:
+            pass
+    if sub.empty:
+        return jsonify({'success': False, 'message': 'No movies match your filters'})
+    row = sub.sample(1).iloc[0]
+    card = movie_to_card(row)
+    card['poster'] = get_poster(card['id'], card['title'])
+    card['overview'] = str(row.get('overview', ''))[:200]
+    card['genres_list'] = list(row['genres_list']) if isinstance(row.get('genres_list'), list) else []
+    return jsonify({'success': True, 'movie': card})
+
+
+@app.route('/api/wrapped/<username>')
+def api_wrapped(username):
+    """Generate a Spotify Wrapped-style stats summary for a user."""
+    try:
+        wl = pd.read_csv(csv_path('watchlist.csv'))
+        fb = pd.read_csv(csv_path('feedback.csv'))
+        rv = pd.read_csv(csv_path('reviews.csv'))
+
+        user_wl = wl[wl['username'] == username]
+        user_likes = fb[(fb['username'] == username) & (fb['feedback'] == 'Like')]
+        user_reviews = rv[rv['username'] == username]
+
+        # Combine all interacted movies
+        all_titles = pd.concat([
+            user_wl['movie'], user_likes['movie'], user_reviews['movie']
+        ]).unique()
+
+        if len(all_titles) == 0:
+            return jsonify({'success': False, 'message': 'Not enough data yet. Watch and like more movies!'})
+
+        interacted = movies_df[movies_df['title'].isin(all_titles)]
+
+        # Total movies
+        total_movies = len(all_titles)
+
+        # Total runtime (hours) — runtime may not exist in dataset
+        total_hours = 0
+        if 'runtime' in interacted.columns:
+            total_minutes = interacted['runtime'].fillna(0).sum()
+            total_hours = round(total_minutes / 60, 1)
+        else:
+            # Estimate ~120 min per movie as fallback
+            total_hours = round(total_movies * 2, 1)
+
+        # Top genres
+        genres = []
+        for _, r in interacted.iterrows():
+            if isinstance(r.get('genres_list'), list):
+                genres.extend(r['genres_list'])
+        genre_counts = pd.Series(genres).value_counts().head(5).to_dict() if genres else {}
+        top_genre = list(genre_counts.keys())[0] if genre_counts else 'Unknown'
+
+        # Top directors — director column may not exist
+        dir_counts = {}
+        top_director = 'Unknown'
+        if 'director' in interacted.columns:
+            directors = interacted['director'].dropna()
+            directors = directors[directors != 'Unknown']
+            dir_counts = directors.value_counts().head(3).to_dict()
+            top_director = list(dir_counts.keys())[0] if dir_counts else 'Unknown'
+
+        # Favorite decade
+        decades = interacted['year_int'].dropna()
+        decades = (decades // 10 * 10).astype(int)
+        decade_counts = decades.value_counts().head(3).to_dict()
+        fav_decade = f"{list(decade_counts.keys())[0]}s" if decade_counts else 'Unknown'
+
+        # Average rating of watched movies
+        avg_rating = round(interacted['vote_average'].mean(), 1) if not interacted.empty else 0
+
+        # Total reviews and average review rating
+        total_reviews = len(user_reviews)
+        avg_review_rating = round(user_reviews['rating'].mean(), 1) if not user_reviews.empty else 0
+
+        # Sentiment breakdown of reviews
+        sentiment_dist = {}
+        if not user_reviews.empty and 'sentiment' in user_reviews.columns:
+            sentiment_dist = user_reviews['sentiment'].value_counts().to_dict()
+
+        # Longest movie watched
+        longest = None
+        if not interacted.empty and 'runtime' in interacted.columns:
+            valid_rt = interacted[interacted['runtime'].fillna(0) > 0]
+            if not valid_rt.empty:
+                lr = valid_rt.loc[valid_rt['runtime'].idxmax()]
+                longest = {'title': lr['title'], 'runtime': int(lr['runtime'])}
+
+        # Highest rated movie in user's list
+        best = None
+        if not interacted.empty:
+            br = interacted.loc[interacted['vote_average'].idxmax()]
+            best = {'title': br['title'], 'rating': round(float(br['vote_average']), 1)}
+
+        # Top movie poster for visual
+        top_movie_poster = ''
+        if not interacted.empty:
+            top_row = interacted.sort_values('vote_average', ascending=False).iloc[0]
+            top_movie_poster = get_poster(int(top_row['movie_id']), top_row['title'])
+
+        # Movie personality type
+        personality = 'The Explorer'
+        if top_genre in ('Action', 'Thriller', 'Crime'):
+            personality = 'The Adrenaline Junkie 🔥'
+        elif top_genre in ('Comedy', 'Animation'):
+            personality = 'The Fun Lover 😂'
+        elif top_genre in ('Romance', 'Drama'):
+            personality = 'The Dreamer 💫'
+        elif top_genre in ('Horror', 'Mystery'):
+            personality = 'The Thrill Seeker 👻'
+        elif top_genre in ('Science Fiction', 'Fantasy'):
+            personality = 'The Visionary 🚀'
+        elif top_genre == 'Documentary':
+            personality = 'The Knowledge Seeker 📚'
+
+        return jsonify({
+            'success': True,
+            'total_movies': total_movies,
+            'total_hours': total_hours,
+            'top_genre': top_genre,
+            'genre_counts': genre_counts,
+            'top_director': top_director,
+            'dir_counts': dir_counts,
+            'fav_decade': fav_decade,
+            'decade_counts': decade_counts,
+            'avg_rating': avg_rating,
+            'total_reviews': total_reviews,
+            'avg_review_rating': avg_review_rating,
+            'sentiment_dist': sentiment_dist,
+            'longest_movie': longest,
+            'best_movie': best,
+            'top_movie_poster': top_movie_poster,
+            'personality': personality,
+            'total_likes': len(user_likes),
+            'total_watchlist': len(user_wl),
+        })
+    except Exception as e:
+        print(f"Wrapped API error: {e}")
+        return jsonify({'success': False, 'message': 'Failed to generate your Wrapped'})
+
+
 @app.route('/api/graph')
 def api_graph():
     q = request.args.get('q', '').strip()

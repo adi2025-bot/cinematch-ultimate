@@ -79,7 +79,9 @@ function render() {
         case 'recently': html = appShell(recentPage); break;
         case 'insights': html = appShell(insightsPage); break;
         case 'admin': html = appShell(adminPage); break;
+        case 'wrapped': html = appShell(wrappedPage); break;
         case 'graph': html = graphPage(); break;
+        case 'surprise': html = surprisePage(); break;
         default: html = loginPage();
     }
     app.innerHTML = html;
@@ -124,7 +126,7 @@ function appShell(contentFn) {
             <button class="nav-btn ${S.page === 'recently' ? 'active' : ''}" onclick="navigate('recently')"><span class="nav-icon">🕐</span>Recent</button>
             <button class="nav-btn ${S.page === 'watchlist' ? 'active' : ''}" onclick="navigate('watchlist')"><span class="nav-icon">❤️</span>Saved</button>
             <button class="nav-btn ${S.page === 'liked' ? 'active' : ''}" onclick="navigate('liked')"><span class="nav-icon">👍</span>Liked</button>
-            <button class="nav-btn ${S.page === 'insights' ? 'active' : ''}" onclick="navigate('insights')"><span class="nav-icon">🧠</span>ML</button>
+            <button class="nav-btn ${S.page === 'wrapped' ? 'active' : ''}" onclick="navigate('wrapped')"><span class="nav-icon">🎁</span>Wrapped</button>
             ${isAdmin ? `<button class="nav-btn ${S.page === 'admin' ? 'active' : ''}" onclick="navigate('admin')"><span class="nav-icon">📊</span>Admin</button>` : ''}
             <button class="nav-btn" onclick="logout()"><span class="nav-icon">🚪</span>Exit</button>
         </div>
@@ -177,6 +179,16 @@ function splashPage() {
 // ===== HOME PAGE =====
 function homePage() {
     return `<div id="genreContainer"></div>
+    <div style="padding:0 16px 16px;">
+        <div class="surprise-home-banner" onclick="navigate('surprise')">
+            <div class="surprise-home-icon">🎲</div>
+            <div class="surprise-home-text">
+                <div class="surprise-home-title">Surprise Me!</div>
+                <div class="surprise-home-sub">Can't decide? Let fate pick your next movie</div>
+            </div>
+            <div class="surprise-home-arrow">→</div>
+        </div>
+    </div>
     <div class="section-title">🏆 Top Rated</div><div id="movieGrid" class="movie-grid">${loadingCards(12)}</div>`;
 }
 
@@ -480,6 +492,7 @@ function bindEvents() {
     if (S.page === 'insights') loadInsights();
     if (S.page === 'admin') loadAdmin();
     if (S.page === 'actor') loadActorProfile();
+    if (S.page === 'wrapped') loadWrapped();
 }
 
 // ===== AUTH HANDLERS =====
@@ -1310,6 +1323,342 @@ async function adminResetPassword() {
     const res = await api('admin/reset-password', { method: 'POST', body: { username: u, new_password: p } });
     if (res.success) { toast(`Password reset for ${u}`); document.getElementById('adminNewPass').value = ''; }
     else toast(res.message, 'error');
+}
+
+// ===== SURPRISE ME — RANDOM MOVIE PICKER =====
+function surprisePage() {
+    const genres = S.genreList || [];
+    const decades = ['1960', '1970', '1980', '1990', '2000', '2010', '2020'];
+    return `
+    <div id="surprise-overlay" class="surprise-overlay">
+        <div class="surprise-bg-orbs">
+            <div class="surprise-orb surprise-orb-1"></div>
+            <div class="surprise-orb surprise-orb-2"></div>
+            <div class="surprise-orb surprise-orb-3"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="goBack()" style="position:absolute;top:20px;left:20px;z-index:10;width:auto;background:rgba(15,12,41,0.65);border:1px solid var(--border);backdrop-filter:blur(10px);">← Back</button>
+        
+        <div class="surprise-content">
+            <div class="surprise-header">
+                <div class="surprise-dice" id="surpriseDice">🎲</div>
+                <h1 class="surprise-title">Surprise Me!</h1>
+                <p class="surprise-subtitle">Let the universe pick your next movie</p>
+            </div>
+            
+            <div class="surprise-filters">
+                <select class="surprise-filter-select" id="surpriseGenre">
+                    <option value="">Any Genre</option>
+                    ${genres.filter(g => g !== 'Adult').map(g => `<option value="${g}">${g}</option>`).join('')}
+                </select>
+                <select class="surprise-filter-select" id="surpriseDecade">
+                    <option value="">Any Era</option>
+                    ${decades.map(d => `<option value="${d}">${d}s</option>`).join('')}
+                </select>
+                <select class="surprise-filter-select" id="surpriseRating">
+                    <option value="5">⭐ 5+</option>
+                    <option value="6">⭐ 6+</option>
+                    <option value="7" selected>⭐ 7+</option>
+                    <option value="8">⭐ 8+</option>
+                </select>
+            </div>
+            
+            <button class="surprise-spin-btn" id="surpriseSpinBtn" onclick="spinSurprise()">
+                <span class="surprise-spin-icon">🎰</span>
+                <span>Spin the Wheel!</span>
+            </button>
+            
+            <div id="surpriseResult" class="surprise-result" style="display:none;"></div>
+        </div>
+    </div>`;
+}
+
+async function spinSurprise() {
+    const btn = document.getElementById('surpriseSpinBtn');
+    const dice = document.getElementById('surpriseDice');
+    const result = document.getElementById('surpriseResult');
+    
+    const genre = document.getElementById('surpriseGenre')?.value || '';
+    const decade = document.getElementById('surpriseDecade')?.value || '';
+    const minRating = document.getElementById('surpriseRating')?.value || '7';
+    
+    // Disable button & start animation
+    btn.disabled = true;
+    btn.innerHTML = '<span class="surprise-spin-icon spinning">🎰</span><span>Spinning...</span>';
+    dice.classList.add('surprise-dice-spin');
+    result.style.display = 'none';
+    
+    // Slot machine reel effect
+    const reelEmojis = ['🎬', '🍿', '🎥', '🎞️', '🎭', '🌟', '✨', '🔥', '💫', '⭐'];
+    let reelInterval = setInterval(() => {
+        dice.textContent = reelEmojis[Math.floor(Math.random() * reelEmojis.length)];
+    }, 80);
+    
+    try {
+        const res = await api(`movies/random?genre=${encodeURIComponent(genre)}&decade=${decade}&min_rating=${minRating}`);
+        
+        // Stop reel after minimum dramatic pause
+        await new Promise(r => setTimeout(r, 1500));
+        clearInterval(reelInterval);
+        dice.textContent = '🎲';
+        dice.classList.remove('surprise-dice-spin');
+        
+        if (!res.success) {
+            result.style.display = 'block';
+            result.innerHTML = `<div class="surprise-empty">
+                <div style="font-size:3rem;margin-bottom:12px;">😅</div>
+                <div style="font-weight:600;margin-bottom:6px;">No matches found</div>
+                <div style="color:var(--text-muted);font-size:0.85rem;">${res.message || 'Try different filters!'}</div>
+            </div>`;
+            btn.disabled = false;
+            btn.innerHTML = '<span class="surprise-spin-icon">🎰</span><span>Try Again</span>';
+            return;
+        }
+        
+        const m = res.movie;
+        result.style.display = 'block';
+        result.innerHTML = `
+        <div class="surprise-reveal">
+            <div class="surprise-reveal-glow"></div>
+            <div class="surprise-card" onclick="openMovie(${m.id})">
+                <img src="${m.poster}" alt="${m.title}" class="surprise-card-poster">
+                <div class="surprise-card-info">
+                    <div class="surprise-card-title">${m.title}</div>
+                    <div class="surprise-card-meta">
+                        <span class="stat-pill highlight">⭐ ${m.rating}</span>
+                        <span class="stat-pill">📅 ${m.year}</span>
+                        ${m.genres_list?.slice(0,2).map(g => `<span class="stat-pill">${g}</span>`).join('') || ''}
+                    </div>
+                    ${m.overview ? `<p class="surprise-card-overview">${m.overview}...</p>` : ''}
+                </div>
+            </div>
+            <div class="surprise-actions">
+                <button class="btn btn-primary" onclick="openMovie(${m.id})" style="flex:2;">🎬 View Details</button>
+                <button class="btn btn-secondary" onclick="addWatchlist('${m.title.replace(/'/g,"\\\\'")}')" style="flex:1;">❤️</button>
+            </div>
+        </div>`;
+        
+        triggerBurst('🎬,⭐,🍿,✨,🎉,🌟');
+        
+    } catch (e) {
+        clearInterval(reelInterval);
+        dice.textContent = '🎲';
+        dice.classList.remove('surprise-dice-spin');
+        toast('Something went wrong', 'error');
+    }
+    
+    btn.disabled = false;
+    btn.innerHTML = '<span class="surprise-spin-icon">🎰</span><span>Spin Again!</span>';
+}
+
+// ===== MOVIE WRAPPED — SPOTIFY-STYLE STATS =====
+function wrappedPage() {
+    return `<div class="section-title">🎁 Your CineMatch Wrapped</div>
+        <p style="padding:0 20px 20px;color:var(--text-secondary);font-size:0.9rem;">Your personalized movie journey — powered by your watchlist, likes, and reviews.</p>
+        <div id="wrappedContainer"><div class="loading-container"><div class="spinner"></div><p style="color:var(--text-muted)">Generating your Wrapped...</p></div></div>
+        <div style="height:100px"></div>`;
+}
+
+async function loadWrapped() {
+    const container = document.getElementById('wrappedContainer');
+    if (!container) return;
+    
+    try {
+        const data = await api(`wrapped/${S.user}`);
+        
+        if (!data.success) {
+            container.innerHTML = `<div class="wrapped-empty">
+                <div class="wrapped-empty-icon">🎬</div>
+                <div class="wrapped-empty-title">Not Enough Data Yet!</div>
+                <p class="wrapped-empty-text">${data.message || 'Start watching, liking, and reviewing movies to unlock your Wrapped!'}</p>
+                <button class="btn btn-primary" onclick="navigate('home')" style="max-width:280px;margin:20px auto 0;">🏠 Explore Movies</button>
+            </div>`;
+            return;
+        }
+        
+        // Build slides
+        const slides = [];
+        
+        // Slide 1: Grand opening — Personality
+        slides.push(`
+        <div class="wrapped-slide wrapped-slide-personality">
+            <div class="wrapped-slide-bg-art wrapped-bg-1"></div>
+            <div class="wrapped-badge">CINEMATCH WRAPPED 2026</div>
+            <div class="wrapped-big-emoji">${data.personality.split(' ').pop()}</div>
+            <div class="wrapped-personality-label">You are</div>
+            <div class="wrapped-personality-type">${data.personality}</div>
+            <div class="wrapped-personality-sub">Based on ${data.total_movies} movies in your collection</div>
+        </div>`);
+        
+        // Slide 2: Total stats overview
+        slides.push(`
+        <div class="wrapped-slide wrapped-slide-stats">
+            <div class="wrapped-slide-bg-art wrapped-bg-2"></div>
+            <div class="wrapped-badge">YOUR NUMBERS</div>
+            <div class="wrapped-stat-grid">
+                <div class="wrapped-stat-item">
+                    <div class="wrapped-stat-number">${data.total_movies}</div>
+                    <div class="wrapped-stat-label">Movies</div>
+                </div>
+                <div class="wrapped-stat-item">
+                    <div class="wrapped-stat-number">${data.total_hours}</div>
+                    <div class="wrapped-stat-label">Hours Watched</div>
+                </div>
+                <div class="wrapped-stat-item">
+                    <div class="wrapped-stat-number">${data.total_likes}</div>
+                    <div class="wrapped-stat-label">Likes Given</div>
+                </div>
+                <div class="wrapped-stat-item">
+                    <div class="wrapped-stat-number">${data.total_reviews}</div>
+                    <div class="wrapped-stat-label">Reviews Written</div>
+                </div>
+            </div>
+        </div>`);
+        
+        // Slide 3: Top Genre
+        const genreEntries = Object.entries(data.genre_counts || {});
+        const maxGenre = genreEntries.length ? Math.max(...genreEntries.map(e => e[1])) : 1;
+        const genreColors = ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981'];
+        slides.push(`
+        <div class="wrapped-slide wrapped-slide-genre">
+            <div class="wrapped-slide-bg-art wrapped-bg-3"></div>
+            <div class="wrapped-badge">TOP GENRES</div>
+            <div class="wrapped-big-text">${data.top_genre}</div>
+            <div class="wrapped-genre-sub">was your #1 genre</div>
+            <div class="wrapped-genre-bars">
+                ${genreEntries.map(([genre, count], i) => `
+                <div class="wrapped-genre-row">
+                    <span class="wrapped-genre-name">${genre}</span>
+                    <div class="wrapped-genre-track">
+                        <div class="wrapped-genre-fill" style="width:${(count/maxGenre*100).toFixed(0)}%;background:${genreColors[i%genreColors.length]};animation-delay:${i*0.15}s"></div>
+                    </div>
+                    <span class="wrapped-genre-count">${count}</span>
+                </div>`).join('')}
+            </div>
+        </div>`);
+        
+        // Slide 4: Top Director + Decade
+        slides.push(`
+        <div class="wrapped-slide wrapped-slide-director">
+            <div class="wrapped-slide-bg-art wrapped-bg-4"></div>
+            <div class="wrapped-badge">YOUR TASTE</div>
+            <div class="wrapped-taste-card">
+                <div class="wrapped-taste-icon">🎥</div>
+                <div class="wrapped-taste-label">Favorite Director</div>
+                <div class="wrapped-taste-value">${data.top_director}</div>
+            </div>
+            <div class="wrapped-taste-card">
+                <div class="wrapped-taste-icon">📅</div>
+                <div class="wrapped-taste-label">Favorite Era</div>
+                <div class="wrapped-taste-value">${data.fav_decade}</div>
+            </div>
+            <div class="wrapped-taste-card">
+                <div class="wrapped-taste-icon">⭐</div>
+                <div class="wrapped-taste-label">Avg Movie Rating</div>
+                <div class="wrapped-taste-value">${data.avg_rating}/10</div>
+            </div>
+        </div>`);
+        
+        // Slide 5: Best & Longest movie
+        slides.push(`
+        <div class="wrapped-slide wrapped-slide-highlights">
+            <div class="wrapped-slide-bg-art wrapped-bg-5"></div>
+            <div class="wrapped-badge">HIGHLIGHTS</div>
+            ${data.best_movie ? `
+            <div class="wrapped-highlight-card">
+                <div class="wrapped-highlight-emoji">🏆</div>
+                <div class="wrapped-highlight-label">Highest Rated in Your List</div>
+                <div class="wrapped-highlight-value">${data.best_movie.title}</div>
+                <div class="wrapped-highlight-meta">⭐ ${data.best_movie.rating}/10</div>
+            </div>` : ''}
+            ${data.longest_movie ? `
+            <div class="wrapped-highlight-card">
+                <div class="wrapped-highlight-emoji">⏱️</div>
+                <div class="wrapped-highlight-label">Longest Movie Marathon</div>
+                <div class="wrapped-highlight-value">${data.longest_movie.title}</div>
+                <div class="wrapped-highlight-meta">${Math.floor(data.longest_movie.runtime/60)}h ${data.longest_movie.runtime%60}m</div>
+            </div>` : ''}
+            ${data.total_reviews > 0 ? `
+            <div class="wrapped-highlight-card">
+                <div class="wrapped-highlight-emoji">✍️</div>
+                <div class="wrapped-highlight-label">Your Avg Review Rating</div>
+                <div class="wrapped-highlight-value">${data.avg_review_rating}/10</div>
+                <div class="wrapped-highlight-meta">${data.total_reviews} reviews written</div>
+            </div>` : ''}
+        </div>`);
+        
+        // Render the carousel
+        container.innerHTML = `
+        <div class="wrapped-carousel" id="wrappedCarousel">
+            <div class="wrapped-slides" id="wrappedSlides">
+                ${slides.map((s, i) => `<div class="wrapped-slide-wrapper" data-slide="${i}">${s}</div>`).join('')}
+            </div>
+            <div class="wrapped-dots">
+                ${slides.map((_, i) => `<div class="wrapped-dot ${i === 0 ? 'active' : ''}" onclick="goToWrappedSlide(${i})"></div>`).join('')}
+            </div>
+            <div class="wrapped-nav-arrows">
+                <button class="wrapped-arrow wrapped-arrow-left" onclick="navigateWrapped(-1)">‹</button>
+                <button class="wrapped-arrow wrapped-arrow-right" onclick="navigateWrapped(1)">›</button>
+            </div>
+        </div>`;
+        
+        // Initialize carousel
+        S.wrappedSlide = 0;
+        initWrappedSwipe();
+        
+    } catch (e) {
+        console.error('Wrapped error:', e);
+        container.innerHTML = `<div class="wrapped-empty">
+            <div class="wrapped-empty-icon">⚠️</div>
+            <div class="wrapped-empty-title">Something went wrong</div>
+            <p class="wrapped-empty-text">Could not generate your Wrapped. Please try again.</p>
+        </div>`;
+    }
+}
+
+function navigateWrapped(dir) {
+    const slides = document.querySelectorAll('.wrapped-slide-wrapper');
+    if (!slides.length) return;
+    S.wrappedSlide = Math.max(0, Math.min(slides.length - 1, (S.wrappedSlide || 0) + dir));
+    updateWrappedPosition();
+}
+
+function goToWrappedSlide(idx) {
+    S.wrappedSlide = idx;
+    updateWrappedPosition();
+}
+
+function updateWrappedPosition() {
+    const container = document.getElementById('wrappedSlides');
+    if (!container) return;
+    container.style.transform = `translateX(-${S.wrappedSlide * 100}%)`;
+    // Update dots
+    document.querySelectorAll('.wrapped-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === S.wrappedSlide);
+    });
+}
+
+function initWrappedSwipe() {
+    const carousel = document.getElementById('wrappedCarousel');
+    if (!carousel) return;
+    let startX = 0, startY = 0, isDragging = false;
+    
+    carousel.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isDragging = true;
+    }, { passive: true });
+    
+    carousel.addEventListener('touchend', e => {
+        if (!isDragging) return;
+        isDragging = false;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        // Only handle horizontal swipes
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+            if (dx < 0) navigateWrapped(1);
+            else navigateWrapped(-1);
+        }
+    }, { passive: true });
 }
 
 // ===== 3D KNOWLEDGE GRAPH =====
