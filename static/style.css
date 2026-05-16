@@ -1014,3 +1014,178 @@ a, button, input, select, textarea, .movie-card, .nav-btn, .tab-btn, .cast-circl
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ============================================================
+   3D KNOWLEDGE GRAPH — Side Panel & UI
+   ============================================================ */
+
+/* Full-screen 3D container */
+#3d-graph-container {
+    touch-action: none; /* Let Three.js handle all touch gestures */
+}
+#3d-graph {
+    width: 100%; height: 100%; position: absolute; inset: 0;
+}
+
+/* ---- Side Panel ---- */
+.graph-side-panel {
+    position: fixed;
+    top: 0; right: 0;
+    width: 340px; max-width: 92vw;
+    height: 100vh; height: 100dvh;
+    background: rgba(10, 8, 26, 0.92);
+    backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+    border-left: 1px solid rgba(139, 92, 246, 0.25);
+    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.6), 0 0 60px rgba(139, 92, 246, 0.08);
+    z-index: 100002;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}
+.graph-side-panel.open {
+    transform: translateX(0);
+}
+
+/* Swipe affordance — drag handle at top */
+.graph-side-panel::before {
+    content: '';
+    display: block;
+    width: 40px; height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    margin: 10px auto 0;
+    flex-shrink: 0;
+}
+
+/* ---- Panel Header ---- */
+.gsp-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+    flex-shrink: 0;
+    position: relative;
+}
+
+.gsp-close {
+    position: absolute; top: 12px; right: 12px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 2;
+}
+.gsp-close:hover, .gsp-close:active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white; transform: scale(1.08);
+}
+
+.gsp-avatar {
+    width: 64px; height: 64px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
+    background: var(--bg-deep);
+}
+
+.gsp-title {
+    font-size: 1.15rem; font-weight: 700;
+    color: white; line-height: 1.3;
+    margin: 0; padding-right: 50px;
+    word-break: break-word;
+}
+
+.gsp-subtitle {
+    font-size: 0.78rem; font-weight: 500;
+    color: var(--accent-light);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-top: 3px;
+}
+
+/* ---- Panel Content ---- */
+.gsp-content {
+    flex: 1; padding: 16px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+}
+
+/* Movie cards inside panel — smaller grid */
+.gsp-content .movie-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 0 !important;
+    padding-bottom: 16px !important;
+}
+.gsp-content .movie-card {
+    animation: none !important; /* Don't animate inside panel */
+}
+.gsp-content .movie-card img {
+    aspect-ratio: 2/3;
+    height: auto;
+}
+
+/* Action button at bottom */
+.gsp-content .btn-primary {
+    flex-shrink: 0;
+    margin-top: 16px;
+}
+
+/* ---- Mobile-specific panel adjustments ---- */
+@media (max-width: 480px) {
+    .graph-side-panel {
+        width: 100vw; max-width: 100vw;
+        border-left: none;
+        border-radius: 0;
+    }
+    .gsp-header {
+        padding: 16px 14px 14px;
+    }
+    .gsp-avatar {
+        width: 56px; height: 56px;
+    }
+    .gsp-title {
+        font-size: 1.05rem;
+    }
+    .gsp-content .movie-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+}
+
+/* ---- Graph Loading Overlay ---- */
+#graph-loading {
+    flex-direction: column; gap: 16px;
+}
+#graph-loading::after {
+    content: '';
+    width: 44px; height: 44px;
+    border: 3px solid rgba(139, 92, 246, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-top: 12px;
+}
+
+/* ---- Graph Exit Button — larger touch target on mobile ---- */
+@media (max-width: 480px) {
+    #3d-graph-container > button:first-of-type {
+        min-width: 48px; min-height: 48px;
+        padding: 12px 18px !important;
+        font-size: 0.85rem !important;
+        top: 12px !important; left: 12px !important;
+    }
+    /* Title overlay — smaller on mobile */
+    #3d-graph-container > div:last-of-type h2 {
+        font-size: 1rem !important;
+    }
+}
