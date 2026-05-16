@@ -1372,6 +1372,48 @@ function surprisePage() {
     </div>`;
 }
 
+// Web Audio helper for sound effects
+function playSoundFX(type) {
+    try {
+        window.audioCtx = window.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
+        const osc = window.audioCtx.createOscillator();
+        const gain = window.audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(window.audioCtx.destination);
+        
+        const now = window.audioCtx.currentTime;
+        if (type === 'tick') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        } else if (type === 'win') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.setValueAtTime(554.37, now + 0.1);
+            osc.frequency.setValueAtTime(659.25, now + 0.2);
+            osc.frequency.setValueAtTime(880, now + 0.3);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0.2, now + 0.3);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+            osc.start(now);
+            osc.stop(now + 1.0);
+        } else if (type === 'error') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(150, now + 0.3);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+    } catch (e) {}
+}
+
 async function spinSurprise() {
     const btn = document.getElementById('surpriseSpinBtn');
     const dice = document.getElementById('surpriseDice');
@@ -1387,10 +1429,11 @@ async function spinSurprise() {
     dice.classList.add('surprise-dice-spin');
     result.style.display = 'none';
     
-    // Slot machine reel effect
+    // Slot machine reel effect with sound
     const reelEmojis = ['🎬', '🍿', '🎥', '🎞️', '🎭', '🌟', '✨', '🔥', '💫', '⭐'];
     let reelInterval = setInterval(() => {
         dice.textContent = reelEmojis[Math.floor(Math.random() * reelEmojis.length)];
+        playSoundFX('tick');
     }, 80);
     
     try {
@@ -1403,6 +1446,7 @@ async function spinSurprise() {
         dice.classList.remove('surprise-dice-spin');
         
         if (!res.success) {
+            playSoundFX('error');
             result.style.display = 'block';
             result.innerHTML = `<div class="surprise-empty">
                 <div style="font-size:3rem;margin-bottom:12px;">😅</div>
@@ -1437,9 +1481,11 @@ async function spinSurprise() {
             </div>
         </div>`;
         
+        playSoundFX('win');
         triggerBurst('🎬,⭐,🍿,✨,🎉,🌟');
         
     } catch (e) {
+        playSoundFX('error');
         clearInterval(reelInterval);
         dice.textContent = '🎲';
         dice.classList.remove('surprise-dice-spin');
