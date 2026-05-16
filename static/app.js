@@ -1446,16 +1446,29 @@ async function init3DGraph() {
     
     // ---- Responsive sizing ----
     const screenW = window.innerWidth;
-    const dpr = Math.min(window.devicePixelRatio || 1, 3); // Cap at 3x to save memory
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
     const isMobile = screenW < 768;
-    const spriteW = isMobile ? 14 : 20;
-    const spriteH = isMobile ? 17.5 : 25;
     
-    // Canvas size scaled by DPI for sharp text on Retina screens
-    const canvasBaseW = 256;
-    const canvasBaseH = 320;
-    const canvasW = Math.round(canvasBaseW * dpr);
-    const canvasH = Math.round(canvasBaseH * dpr);
+    // Node sizes — center is biggest, movies medium, actors/directors smaller
+    const sizeMap = {
+        1: { sprite: isMobile ? 22 : 30, canvas: 400, radius: 160 },  // Center node (big)
+        2: { sprite: isMobile ? 14 : 18, canvas: 320, radius: 120 },  // Movie
+        3: { sprite: isMobile ? 15 : 20, canvas: 340, radius: 130 },  // Director
+        4: { sprite: isMobile ? 12 : 16, canvas: 300, radius: 110 },  // Co-actor
+    };
+    
+    const drawInitials = (ctx, dpr, cx, cy, r, label, color, texture) => {
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = color;
+        ctx.font = 'bold 48px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const initials = label.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        ctx.fillText(initials, cx, cy);
+        ctx.restore();
+        texture.needsUpdate = true;
+    };
     
     const Graph = ForceGraph3D()
         (container)
@@ -1463,95 +1476,122 @@ async function init3DGraph() {
         .width(container.clientWidth)
         .height(container.clientHeight)
         .nodeThreeObject(node => {
+            const cfg = sizeMap[node.group] || sizeMap[4];
+            const canvasSize = Math.round(cfg.canvas * dpr);
             const canvas = document.createElement('canvas');
-            canvas.width = canvasW;
-            canvas.height = canvasH;
+            canvas.width = canvasSize;
+            canvas.height = Math.round(cfg.canvas * 1.35 * dpr); // Extra height for label
             const ctx = canvas.getContext('2d');
-            
-            // Scale all drawing by DPI
             ctx.scale(dpr, dpr);
             
-            // Use base coordinates (pre-DPI) for drawing
-            const cx = canvasBaseW / 2;  // 128
-            const cy = canvasBaseW / 2;  // 128
-            const r = 100;
+            const cx = cfg.canvas / 2;
+            const cy = cfg.canvas / 2;
+            const r = cfg.radius;
             
-            // Glow color based on node group
-            const glowColor = node.group === 1 ? '#8B5CF6' : (node.group === 2 ? '#EC4899' : (node.group === 3 ? '#10B981' : '#3B82F6'));
+            // Colors per group
+            const colors = {
+                1: { glow: '#8B5CF6', ring: '#A78BFA', ringOuter: 'rgba(139,92,246,0.3)' }, // Center - purple
+                2: { glow: '#EC4899', ring: '#F472B6', ringOuter: 'rgba(236,72,153,0.3)' }, // Movie - pink
+                3: { glow: '#10B981', ring: '#34D399', ringOuter: 'rgba(16,185,129,0.3)' }, // Director - green
+                4: { glow: '#3B82F6', ring: '#60A5FA', ringOuter: 'rgba(59,130,246,0.3)' }, // Co-actor - blue
+            };
+            const c = colors[node.group] || colors[4];
             
-            ctx.shadowColor = glowColor;
-            ctx.shadowBlur = 25;
+            // Outer glow ring (for center node, extra prominent)
+            if (node.group === 1) {
+                const glowGrad = ctx.createRadialGradient(cx, cy, r - 10, cx, cy, r + 40);
+                glowGrad.addColorStop(0, 'rgba(139,92,246,0.4)');
+                glowGrad.addColorStop(0.5, 'rgba(139,92,246,0.15)');
+                glowGrad.addColorStop(1, 'transparent');
+                ctx.fillStyle = glowGrad;
+                ctx.fillRect(0, 0, cfg.canvas, cfg.canvas);
+            }
+            
+            // Outer subtle ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, r + 6, 0, 2 * Math.PI);
+            ctx.strokeStyle = c.ringOuter;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Dark circle background
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, 2 * Math.PI);
             ctx.fillStyle = '#0a0a1a';
             ctx.fill();
             
-            // Border
-            ctx.lineWidth = 6;
-            ctx.strokeStyle = glowColor;
+            // Glowing border ring
+            ctx.shadowColor = c.glow;
+            ctx.shadowBlur = node.group === 1 ? 30 : 15;
+            ctx.lineWidth = node.group === 1 ? 5 : 3;
+            ctx.strokeStyle = c.ring;
             ctx.stroke();
             ctx.shadowBlur = 0;
             
-            // Label text
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-            const displayLabel = node.label.length > 20 ? node.label.substring(0, 18) + '...' : node.label;
-            ctx.fillText(displayLabel, cx, 270);
+            // ---- Label below circle ----
+            const labelY = cy + r + 24;
             
-            // Center label for primary node
-            if (node.group === 1) {
-                ctx.fillStyle = '#8B5CF6';
-                ctx.font = '20px sans-serif';
-                ctx.fillText('Center', cx, 300);
+            // Name
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${node.group === 1 ? 22 : 18}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const displayLabel = node.label.length > 18 ? node.label.substring(0, 16) + '...' : node.label;
+            ctx.fillText(displayLabel, cx, labelY);
+            
+            // Subtitle (role or year)
+            const subtitle = node.subtitle || '';
+            if (subtitle) {
+                ctx.fillStyle = c.ring;
+                ctx.font = `${node.group === 1 ? 16 : 14}px sans-serif`;
+                ctx.fillText(subtitle, cx, labelY + (node.group === 1 ? 28 : 22));
             }
             
             const texture = new THREE.CanvasTexture(canvas);
             if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
             const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
             const sprite = new THREE.Sprite(material);
-            sprite.scale.set(spriteW, spriteH, 1);
+            const aspect = canvas.height / canvas.width;
+            sprite.scale.set(cfg.sprite, cfg.sprite * aspect, 1);
             
-            // Load node image with error fallback
-            const imgSrc = node.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(node.label)}&background=1a1a2e&color=fff&size=200&rounded=true`;
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            
-            img.onload = () => {
-                ctx.save();
-                ctx.scale(dpr, dpr);  // Re-apply scale for async draw
-                ctx.beginPath();
-                ctx.arc(cx, cy, r - 3, 0, 2 * Math.PI);
-                ctx.clip();
-                const imgScale = (r * 2) / Math.min(img.width, img.height);
-                const w = img.width * imgScale;
-                const h = img.height * imgScale;
-                ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
-                ctx.restore();
-                texture.needsUpdate = true;
-            };
-            
-            img.onerror = () => {
-                // Fallback: draw initials on the circle
-                ctx.save();
-                ctx.scale(dpr, dpr);
-                ctx.fillStyle = glowColor;
-                ctx.font = 'bold 48px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const initials = node.label.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-                ctx.fillText(initials, cx, cy);
-                ctx.restore();
-                texture.needsUpdate = true;
-            };
-            
-            img.src = imgSrc;
+            // ---- Load photo into circle ----
+            const imgSrc = node.img || '';
+            if (imgSrc) {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                
+                img.onload = () => {
+                    ctx.save();
+                    // The context is ALREADY scaled by dpr from line 1473.
+                    // If we scale it again, it double-scales.
+                    // Instead, reset the transform, then re-apply scale to be absolutely certain.
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.scale(dpr, dpr);
+                    
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r - 3, 0, 2 * Math.PI);
+                    ctx.clip();
+                    const imgScale = (r * 2) / Math.min(img.width, img.height);
+                    const w = img.width * imgScale;
+                    const h = img.height * imgScale;
+                    ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+                    ctx.restore();
+                    texture.needsUpdate = true;
+                };
+                
+                img.onerror = () => { drawInitials(ctx, dpr, cx, cy, r, node.label, c.ring, texture); };
+                img.src = imgSrc;
+            } else {
+                drawInitials(ctx, dpr, cx, cy, r, node.label, c.ring, texture);
+            }
             
             return sprite;
         })
         .linkDirectionalParticles(isMobile ? 1 : 2)
-        .linkDirectionalParticleWidth(1.5)
-        .linkColor(() => 'rgba(139, 92, 246, 0.2)')
+        .linkDirectionalParticleWidth(1.2)
+        .linkWidth(0.5)
+        .linkOpacity(0.25)
+        .linkColor(() => 'rgba(139, 92, 246, 0.35)')
         .onNodeClick(node => {
             // Guard against Infinity when nodes are at origin (0,0,0)
             const dist = Math.hypot(node.x || 0, node.y || 0, node.z || 0);

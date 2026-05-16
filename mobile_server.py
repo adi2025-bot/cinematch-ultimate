@@ -575,55 +575,119 @@ def api_graph():
     links = []
     node_ids = set()
     
-    def add_node(id_val, group, label, img=''):
+    def add_node(id_val, group, label, img='', subtitle=''):
         if id_val not in node_ids:
-            nodes.append({'id': id_val, 'group': group, 'label': label, 'img': img})
+            nodes.append({'id': id_val, 'group': group, 'label': label, 'img': img, 'subtitle': subtitle})
             node_ids.add(id_val)
             
     if not q:
         return jsonify({'nodes': [], 'links': []})
+    
+    # ---- Fetch TMDB person photo (cached) ----
+    _person_photo_cache = getattr(api_graph, '_photo_cache', {})
+    api_graph._photo_cache = _person_photo_cache
+    
+    def fetch_person_photo(name):
+        if name in _person_photo_cache:
+            return _person_photo_cache[name]
+        try:
+            resp = tmdb_session.get(
+                f"https://api.themoviedb.org/3/search/person?api_key={API_KEY}&query={urllib.parse.quote(name)}&page=1",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                results = resp.json().get('results', [])
+                if results and results[0].get('profile_path'):
+                    url = "https://image.tmdb.org/t/p/w200" + results[0]['profile_path']
+                    _person_photo_cache[name] = url
+                    return url
+        except:
+            pass
+        _person_photo_cache[name] = ''
+        return ''
+    
+    def fetch_movie_poster(movie_id):
+        """Fetch poster from TMDB by movie ID."""
+        try:
+            resp = tmdb_session.get(
+                f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('poster_path'):
+                    return "https://image.tmdb.org/t/p/w200" + data['poster_path']
+        except:
+            pass
+        return ''
         
     if type_ == 'actor':
         sub = movies_df[movies_df['top_cast'].astype(str).str.lower().str.contains(q.lower(), regex=False, na=False)]
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         actor_name = q.title()
-        add_node(actor_name, 1, actor_name)
+        add_node(actor_name, 1, actor_name, '', 'Actor')
         
-        for idx, row in sub.head(15).iterrows():
+        for idx, row in sub.head(12).iterrows():
             m_id = row['title']
+            year = str(row.get('year_int', '')) if row.get('year_int', 0) > 0 else ''
             poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
-            add_node(m_id, 2, m_id, poster)
+            if not poster and row.get('movie_id'):
+                poster = fetch_movie_poster(row['movie_id'])
+            add_node(m_id, 2, m_id, poster, year)
             links.append({'source': actor_name, 'target': m_id})
             
             d = row.get('director', '')
             if isinstance(d, list) and len(d) > 0: d = d[0]
             if pd.notnull(d) and d != 'Unknown' and isinstance(d, str):
-                add_node(d, 3, d)
+                add_node(d, 3, d, '', 'Director')
                 links.append({'source': m_id, 'target': d})
                 
             if isinstance(row.get('top_cast'), list):
-                for co in row['top_cast'][:4]:
+                for co in row['top_cast'][:3]:
                     if co.lower() != q.lower():
-                        add_node(co, 4, co)
+                        add_node(co, 4, co, '', 'Actor')
                         links.append({'source': m_id, 'target': co})
+        
+        # Batch-fetch all person photos in parallel
+        person_nodes = [n for n in nodes if n['group'] in (1, 3, 4)]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            names = [n['label'] for n in person_nodes]
+            photos = list(executor.map(fetch_person_photo, names))
+            for node, photo in zip(person_nodes, photos):
+                if photo:
+                    node['img'] = photo
+        
         return jsonify({'nodes': nodes, 'links': links})
         
     elif type_ == 'director':
         sub = movies_df[movies_df['director'].astype(str).str.lower().str.contains(q.lower(), regex=False, na=False)]
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         dir_name = q.title()
-        add_node(dir_name, 3, dir_name)
+        add_node(dir_name, 3, dir_name, '', 'Director')
         
-        for idx, row in sub.head(15).iterrows():
+        for idx, row in sub.head(12).iterrows():
             m_id = row['title']
+            year = str(row.get('year_int', '')) if row.get('year_int', 0) > 0 else ''
             poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
-            add_node(m_id, 2, m_id, poster)
+            if not poster and row.get('movie_id'):
+                poster = fetch_movie_poster(row['movie_id'])
+            add_node(m_id, 2, m_id, poster, year)
             links.append({'source': dir_name, 'target': m_id})
             
             if isinstance(row.get('top_cast'), list):
-                for co in row['top_cast'][:4]:
-                    add_node(co, 4, co)
+                for co in row['top_cast'][:3]:
+                    add_node(co, 4, co, '', 'Actor')
                     links.append({'source': m_id, 'target': co})
+        
+        # Batch-fetch person photos
+        person_nodes = [n for n in nodes if n['group'] in (3, 4)]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            names = [n['label'] for n in person_nodes]
+            photos = list(executor.map(fetch_person_photo, names))
+            for node, photo in zip(person_nodes, photos):
+                if photo:
+                    node['img'] = photo
+        
         return jsonify({'nodes': nodes, 'links': links})
         
     elif type_ == 'movie':
@@ -631,19 +695,32 @@ def api_graph():
         if sub.empty: return jsonify({'nodes': [], 'links': []})
         row = sub.iloc[0]
         m_id = row['title']
+        year = str(row.get('year_int', '')) if row.get('year_int', 0) > 0 else ''
         poster = "https://image.tmdb.org/t/p/w200" + row['poster_path'] if pd.notnull(row.get('poster_path')) else ''
-        add_node(m_id, 1, m_id, poster)
+        if not poster and row.get('movie_id'):
+            poster = fetch_movie_poster(row['movie_id'])
+        add_node(m_id, 1, m_id, poster, year)
         
         d = row.get('director', '')
         if isinstance(d, list) and len(d) > 0: d = d[0]
         if pd.notnull(d) and d != 'Unknown' and isinstance(d, str):
-            add_node(d, 3, d)
+            add_node(d, 3, d, '', 'Director')
             links.append({'source': m_id, 'target': d})
             
         if isinstance(row.get('top_cast'), list):
             for co in row['top_cast'][:6]:
-                add_node(co, 4, co)
+                add_node(co, 4, co, '', 'Actor')
                 links.append({'source': m_id, 'target': co})
+        
+        # Batch-fetch person photos
+        person_nodes = [n for n in nodes if n['group'] in (3, 4)]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            names = [n['label'] for n in person_nodes]
+            photos = list(executor.map(fetch_person_photo, names))
+            for node, photo in zip(person_nodes, photos):
+                if photo:
+                    node['img'] = photo
+        
         return jsonify({'nodes': nodes, 'links': links})
         
     return jsonify({'nodes': [], 'links': []})
